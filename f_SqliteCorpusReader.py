@@ -10,12 +10,14 @@ import bs4
 
 from nltk import pos_tag, sent_tokenize, wordpunct_tokenize
 
+import json
+
 log = logging.getLogger("readability.readability")
 log.setLevel('WARNING')
 
 TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li']
 
-class SQLiteHTML_Connector(SqliteOperation):
+class SQLiteHtmlJson_Connector(SqliteOperation):
     """Connector between SqliteOperation and HTMLCorpusReader.
     Case specific class.
 
@@ -34,78 +36,85 @@ class SQLiteHTML_Connector(SqliteOperation):
         return iterable_row
     
     def html_connector(self, limit: int = None):
-        return self.html(self.get_preprocessed_datas(10))
-
-class HTMLCorpusReader(SQLiteHTML_Connector):
+        return self.html(self.get_preprocessed_datas(limit))
+    
+    def generate_json_string(self, content:str):
+        return json.dumps(content)
+    
+class HTMLCorpusReader(SQLiteHtmlJson_Connector):
     def __init__(self, limits:int=None, tags:list = TAGS):
-        SQLiteHTML_Connector.__init__(self)
-        self.preprocessed_datas = self.get_preprocessed_datas(limits)
+        SQLiteHtmlJson_Connector.__init__(self)
+        self.preprocessed_htmls = self.get_preprocessed_datas(limits)
         # Save the tags that we specifically want to extract.
         self.tags = tags
     
-    def html(self):
+    def html(self, html_content:str):
         """
         Returns the HTML content of each document, cleaning it using
         the readability-lxml library.
         """
-        for i in self.preprocessed_datas:
-            try:
-                # i is a tuple therefore to get its content, i[0] will be used 
-                # in next line.
-                yield Paper(i[0]).summary()
-            except Unparseable as e:
-                print("Could not parse HTML: {}".format(e))
-                continue
+        try:
+            yield Paper(html_content).summary()
+        except Unparseable as e:
+            print("Could not parse HTML: {}".format(e))
     
-    def paras(self):
+    def paras(self, html_content:str):
         """
         Uses BeautifulSoup to parse the paragraphs from the HTML.
         """
-        for html in self.html():
+        for html in self.html(html_content):
             soup = bs4.BeautifulSoup(html, 'lxml')
             for element in soup.find_all(self.tags):
                 yield element.text
             soup.decompose()
     
     
-    def sents(self):
+    def sents(self, html_content:str):
         """
         Uses the built in sentence tokenizer to extract sentences from the
         paragraphs. Note that this method uses BeautifulSoup to parse HTML.
         """
-        for paragraph in self.paras():
+        for paragraph in self.paras(html_content):
             for sentence in sent_tokenize(paragraph):
                 yield sentence
 
-    def words(self):
+    def words(self, html_content:str):
         """
         Uses the built in word tokenizer to extract tokens from sentences.
         Note that this method uses BeautifulSoup to parse HTML content.
         """
-        for sentence in self.sents():
+        for sentence in self.sents(html_content):
             for token in wordpunct_tokenize(sentence):
                 yield token
 
-    def tokenize(self):
+    def tokenize(self, html_content:str):
         """
         Segments, tokenizes, and tags a document in the corpus.
         """
-        for paragraph in self.paras():
+        for paragraph in self.paras(html_content):
             yield [
                 pos_tag(wordpunct_tokenize(sent))
                 for sent in sent_tokenize(paragraph)
             ]
     
     def process(self):
-        return
+        for html in self.preprocessed_htmls:
+            yield [content for content in self.tokenize(html[0])]
 
 if __name__ == "__main__":
     sqlite_handler = HTMLCorpusReader(limits=10)
-    # for i in sqlite_handler.preprocessd_datas:
+    # for i in sqlite_handler.preprocessd_htmls:
     #     print(i[0])
     #     print(sqlite_handler.html_single(i[0]))
     
-    iter_result = sqlite_handler.tokenize()
-    for i in iter_result:
-        print(i)
-    print("finished")
+    # for i in sqlite_handler.preprocessed_htmls:
+    #     html_content_list = []
+    #     for x in sqlite_handler.tokenize(i[0]):
+    #         html_content_list.append(x)
+    #     print(html_content_list)
+    #     print("Finish with one html.")
+    # print("finished")
+    
+    for i in sqlite_handler.process():
+        print(sqlite_handler.generate_json_string(i))
+    

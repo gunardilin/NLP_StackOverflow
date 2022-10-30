@@ -95,6 +95,20 @@ class SqliteOperation(object):
         # print("*** Query commited successfully.")
         return
     
+    def add_new_column(self, table_name:str, new_column_name:str, \
+        new_column_format:str) -> None:
+        base = "ALTER TABLE {} ADD {} {}"
+        return base.format(table_name, new_column_name, new_column_format)
+    
+    def update_column(self, table_name, column_name, column_value, \
+        where_column, where_value):
+        #UPDATE preprocessed_datas SET preprocessed_html = NULL WHERE id = 71367783
+        base = "UPDATE {} SET {} = {} WHERE {} = {}"
+        query = base.format(table_name, column_name, column_value, where_column, \
+            where_value)
+        self.execute_query(query, commit_=False)
+        return
+    
     def generate_query_to_read_db(self, name:str, select_attr:str="*", \
         where_attr:str=None, like_attr:str=None, order_attr:str=None, \
         descending:Boolean=True, limit:int=None, offset:int=None) -> str:
