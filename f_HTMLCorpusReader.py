@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from re import L
 from b_sqlite_operation import SqliteOperation
 import logging
 
@@ -19,13 +18,13 @@ log.setLevel('WARNING')
 TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li']
 
 class SQLiteHtmlJson_Connector(SqliteOperation):
-    """Connector between SqliteOperation and HTMLCorpusReader.
+    """Connector among SqliteOperation,  HTMLCorpusReader and Json operations.
     Case specific class.
 
     Args:
         SqliteOperation (Class): Class that contains SQLite basic operations.
     """
-    def __init__(self, path: str = "Python/DB/StackOverflow.sqlite", batchsize: int = 50, \
+    def __init__(self, path: str = "/Users/GunardiLin/Desktop/Project/ProjectStackOverflow/Python/DB/StackOverflow.sqlite", batchsize: int = 50, \
         tablename: str = "preprocessed_datas", sql_from_value: str = "id, content"):
         SqliteOperation.__init__(self, path, batchsize)
         self.tablename = tablename  # # SELECT ... FROM (...)

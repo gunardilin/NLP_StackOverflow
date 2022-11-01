@@ -1,6 +1,6 @@
 # Generate preprocessed_html and store in SQLite DB
 
-from f_SqliteCorpusReader import HTMLCorpusReader, SQLiteHtmlJson_Connector
+from f_HTMLCorpusReader import HTMLCorpusReader, SQLiteHtmlJson_Connector
 import datetime
 
 start_time = datetime.datetime.now()
@@ -21,7 +21,8 @@ for query in query_list:
     html_tokens = corpus_handler.process(content_list)
     counter = 0
     for i in html_tokens:
-        json_str = sqlite_handler.generate_json_string(i).replace('"', """'""")
+        json_str = sqlite_handler.generate_json_string(i).replace('"', "'")
+        # Above code is necessary, otherwise the next sqlite operation won't work.
         sqlite_handler.update_column(sqlite_handler.tablename, \
             "preprocessed_html", "id", json_str, id_list[counter])
         counter += 1
