@@ -100,10 +100,10 @@ class SqliteOperation(object):
         base = "ALTER TABLE {} ADD {} {}"
         return base.format(table_name, new_column_name, new_column_format)
     
-    def update_column(self, table_name, column_name, column_value, \
-        where_column, where_value):
+    def update_column(self, table_name, column_name, where_column, column_value, \
+        where_value):
         #UPDATE preprocessed_datas SET preprocessed_html = NULL WHERE id = 71367783
-        base = "UPDATE {} SET {} = {} WHERE {} = {}"
+        base = """UPDATE {} SET {} = "{}" WHERE {} = {}"""
         query = base.format(table_name, column_name, column_value, where_column, \
             where_value)
         self.execute_query(query, commit_=False)
@@ -117,7 +117,7 @@ class SqliteOperation(object):
         base = base.format(select_attr, name)
         if where_attr != None:
             where_base = r'WHERE {} LIKE {}'
-            where_base.format(where_attr, like_attr)
+            where_base = where_base.format(where_attr, like_attr)
             base = " ".join([base, where_base])
         if order_attr != None:
             order_base = r'ORDER BY {} {}'

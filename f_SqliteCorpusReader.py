@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from re import L
 from b_sqlite_operation import SqliteOperation
 import logging
 
@@ -24,27 +25,26 @@ class SQLiteHtmlJson_Connector(SqliteOperation):
     Args:
         SqliteOperation (Class): Class that contains SQLite basic operations.
     """
-    def __init__(self, path: str = "DB/StackOverflow.sqlite", batchsize: int = 50, \
-        tablename: str = "preprocessed_datas", sql_from_value: str = "content"):
+    def __init__(self, path: str = "Python/DB/StackOverflow.sqlite", batchsize: int = 50, \
+        tablename: str = "preprocessed_datas", sql_from_value: str = "id, content"):
         SqliteOperation.__init__(self, path, batchsize)
         self.tablename = tablename  # # SELECT ... FROM (...)
         self.sql_from_value = sql_from_value # SELECT (...) FROM ...
     
     def get_preprocessed_datas(self, limit: int = None):
+        # Use get_preprocessed_datas_batchwise to read DB in memory friendly way.
         iterable_row = self.read_from_db(self.tablename, self.sql_from_value, \
             limit=limit)
         return iterable_row
     
-    def html_connector(self, limit: int = None):
-        return self.html(self.get_preprocessed_datas(limit))
-    
     def generate_json_string(self, content:str):
         return json.dumps(content)
     
-class HTMLCorpusReader(SQLiteHtmlJson_Connector):
-    def __init__(self, limits:int=None, tags:list = TAGS):
-        SQLiteHtmlJson_Connector.__init__(self)
-        self.preprocessed_htmls = self.get_preprocessed_datas(limits)
+    def load_json(self, content:str):
+        return json.loads(content)
+    
+class HTMLCorpusReader():
+    def __init__(self, tags:list = TAGS):
         # Save the tags that we specifically want to extract.
         self.tags = tags
     
@@ -97,12 +97,15 @@ class HTMLCorpusReader(SQLiteHtmlJson_Connector):
                 for sent in sent_tokenize(paragraph)
             ]
     
-    def process(self):
-        for html in self.preprocessed_htmls:
-            yield [content for content in self.tokenize(html[0])]
+    def process(self, htmls:list):
+        # htmls contains a list of html-strings.
+        for html in htmls:
+            yield [content for content in self.tokenize(html)]
 
 if __name__ == "__main__":
-    sqlite_handler = HTMLCorpusReader(limits=10)
+    sqlite_handler = SQLiteHtmlJson_Connector()
+    htmls = sqlite_handler.get_preprocessed_datas(limit=10)
+    html_handler = HTMLCorpusReader(htmls)
     # for i in sqlite_handler.preprocessd_htmls:
     #     print(i[0])
     #     print(sqlite_handler.html_single(i[0]))
@@ -115,6 +118,6 @@ if __name__ == "__main__":
     #     print("Finish with one html.")
     # print("finished")
     
-    for i in sqlite_handler.process():
+    for i in html_handler.process():
         print(sqlite_handler.generate_json_string(i))
     
