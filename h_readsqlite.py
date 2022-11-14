@@ -12,8 +12,10 @@ import json
 # for i in iterable_row:
 #     print(sqlite_handler.load_json(i[0].replace("""'""", '"')))
 
+import time
+
 class SqliteCorpusReader(SqliteOperation):
-    def __init__(self, path: str = "Python/DB/StackOverflow.sqlite", batchsize: int = 50, \
+    def __init__(self, path: str, batchsize: int = 50, \
         tablename: str = "preprocessed_datas", sql_from_value: str = "preprocessed_html"):
         SqliteOperation.__init__(self, path, batchsize)
         self.tablename = tablename
@@ -55,15 +57,21 @@ class SqliteCorpusReader(SqliteOperation):
                 
 
 if __name__ == "__main__":
-    corpus_reader = SqliteCorpusReader()
+    start_time = time.time()
+    PATH =  "DB/StackOverflow.sqlite"
+    corpus_reader = SqliteCorpusReader(path=PATH)
     counter = 0
-    for year in range(2018,2023):
+    for year in range(2022,2023):
+        print("Start reading datas for year {}.".format(year))
         for i in corpus_reader.docs(year):
             counter += 1
         print("Year {}".format(str(year)))
         print("List counter: {}".format(counter))
         print("Error counter: {}".format(str(corpus_reader.error_counter)))
         print("Percentage: {}%".format(round(corpus_reader.error_counter/counter, 4)))
+    end_time = time.time()
+    print("Duration: {} seconds".format(round(end_time-start_time, 2)))
+        
 
 # class PickledCorpusReader(CategorizedCorpusReader, CorpusReader):
 
