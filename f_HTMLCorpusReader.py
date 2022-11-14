@@ -43,6 +43,8 @@ class SQLiteHtmlJson_Connector(SqliteOperation):
         return json.loads(content)
     
 class HTMLCorpusReader():
+    # In this project this class will be used to read html raw data from SQLite
+    # The read datas will be preprocessed and tokenized (refer to g_preprocess.py)
     def __init__(self, tags:list = TAGS):
         # Save the tags that we specifically want to extract.
         self.tags = tags
@@ -117,6 +119,6 @@ if __name__ == "__main__":
     #     print("Finish with one html.")
     # print("finished")
     
-    for i in html_handler.process():
-        print(sqlite_handler.generate_json_string(i))
+    # for i in html_handler.process():
+    #     print(sqlite_handler.generate_json_string(i))
     

@@ -45,7 +45,7 @@ class SqliteCorpusReader(SqliteOperation):
         """
         base = base.format(timestamp)
         self.execute_query(base)
-        error_counter = 0
+        self.error_counter = 0
         for i in self.last_cursor:
             try:
                 json_str = i[0].replace("['", '["').replace("', '", '", "').\
