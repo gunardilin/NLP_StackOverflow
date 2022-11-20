@@ -8,6 +8,7 @@ from gensim.matutils import sparse2full
 import unicodedata
 from nltk.corpus import wordnet as wn
 from nltk.stem.wordnet import WordNetLemmatizer
+import numpy as np
 
 def tokenize(text:str, language:str="english")-> Generator[str]:
     """Remove affixes, e.g. plurality, -"ing", -"tion", etc.
@@ -27,9 +28,63 @@ def tokenize(text:str, language:str="english")-> Generator[str]:
         if token in string.punctuation:
             continue
         yield stem.stem(token)
+class TextNormalizer(BaseEstimator, TransformerMixin):
+    """This class performs lemmatization."""
+    
+    def __init__(self, language='english'):
+        self.stopwords = set(nltk.corpus.stopwords.words(language))
+        self.lemmatizer = WordNetLemmatizer()
         
+    def is_punct(self, token):
+        """ Detecting punctuations: .,!/? and more..."""
+        return all(
+            unicodedata.category(char).startswith('P') for char in token
+        )
+    
+    def is_stopword(self, token):
+        """ Detecting stopwords: a, in, of and more..."""
+        return token.lower() in self.stopwords
+    
+    def lemmatize(self, token:str, pos_tag:str) -> str:
+        """ Perform lemmatization.
+        Examples of lemmatization:
+        -> rocks : rock
+        -> corpora : corpus
+        -> better : good
+
+        Args:
+            token (str): word token
+            pos_tag (str): Penn Treebank tag
+
+        Returns:
+            str: lemmatized word
+        """
+        tag = {
+            'N': wn.NOUN,
+            'V': wn.VERB,
+            'R': wn.ADV,
+            'J': wn.ADJ
+        }.get(pos_tag[0], wn.NOUN)
+        return self.lemmatizer.lemmatize(token, tag)
+    
+    def normalize(self, document):
+        return [
+            self.lemmatize(token, tag).lower()
+            for paragraph in document
+            for sentence in paragraph
+            for (token, tag) in sentence
+            if not self.is_punct(token) and not self.is_stopword(token)
+        ]
+    
+    def fit(self, X, y=None):
+        return self
+    
+    def transform(self, documents):
+        for document in documents:
+            yield self.normalize(document)
+
 class GensimVectorizer(BaseEstimator, TransformerMixin):
-    """Implementing TF-IDF Vectorizer using Gensim library.
+    """Vectorizing each document when self.transform is executed.
     Reason for using Gensim: Gensim Dictionary can be saved to disk.
     It allows reloading the Dictionary without requiring a refit.
     """
@@ -57,49 +112,12 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         self.save()
         return self
     
-    def transform(self, documents):
+    def transform(self, documents:list) -> Generator[np.ndarray]:
+        """
+        Transforming document vectors so that every document contains exactly 
+        "len(self.id2word)" length.
+        """
         for document in documents:
+            # Applying frequency vectorization:
             docvec = self.id2word.doc2bow(document)
             yield sparse2full(docvec, len(self.id2word))
-
-class TextNormalizer(BaseEstimator, TransformerMixin):
-    """This class performs lemmatization."""
-    
-    def __init__(self, language='english'):
-        self.stopwords = set(nltk.corpus.stopwords.words(language))
-        self.lemmatizer = WordNetLemmatizer()
-        
-    def is_punct(self, token):
-        """ Detecting punctuations: .,!/? and more..."""
-        return all(
-            unicodedata.category(char).startswith('P') for char in token
-        )
-    
-    def is_stopword(self, token):
-        """ Detecting stopwords: a, in, of and more..."""
-        return token.lower() in self.stopwords
-    
-    def lemmatize(self, token, pos_tag):
-        tag = {
-            'N': wn.NOUN,
-            'V': wn.VERB,
-            'R': wn.ADV,
-            'J': wn.ADJ
-        }.get(pos_tag[0], wn.Noun)
-        return self.lemmatizer.lemmatize(token, tag)
-    
-    def normalize(self, document):
-        return [
-            self.lemmatize(token, tag).lower()
-            for paragraph in document
-            for sentence in paragraph
-            for (token, tag) in sentence
-            if not self.is_punct(token) and not self.is_stopword(token)
-        ]
-    
-    def fit(self, X, y=None):
-        return self
-    
-    def transform(self, documents):
-        for document in documents:
-            yield self.normalize(document[0])
