@@ -22,12 +22,18 @@ class SqliteCorpusReader(SqliteOperation):
         self.sql_from_value = sql_from_value
         self.error_counter = 0
     
-    # def get_preprocessed_datas(self, where_attr:str=None, like_attr:str=None,\
-    #     limit:int=None):
-    #     # Create Generator to read one row from Sqlite at a time.
-    #     iter_row = self.read_from_db(self.tablename, self.sql_from_value,\
-    #         where_attr, like_attr, limit=limit)
-    #     return iter_row
+    def ids(self, timestamp:str=None):
+        """
+        Returns all document ids with the selected timestamp.
+        """
+        base = """
+        SELECT id
+        FROM raw_datas
+        WHERE creation_date LIKE "{}%"
+        """
+        base = base.format(timestamp)
+        self.execute_query(base)
+        return list(self.last_cursor)
     
     def docs(self, timestamp:str=None):
         """
@@ -54,6 +60,32 @@ class SqliteCorpusReader(SqliteOperation):
                 yield json.loads(json_str)
             except:
                 self.error_counter += 1
+
+    def paras(self, timestamp:str=None):
+        """
+        Returns a generator of paragraphs where each paragraph is a list of
+        sentences, which is in turn a list of (token, tag) tuples.
+        """
+        for doc in self.docs(timestamp):
+            for paragraph in doc:
+                yield paragraph
+
+    def sents(self, timestamp:str=None):
+        """
+        Returns a generator of sentences where each sentence is a list of
+        (token, tag) tuples.
+        """
+        for paragraph in self.paras(timestamp):
+            for sentence in paragraph:
+                yield sentence
+
+    def words(self, timestamp:str=None):
+        """
+        Returns a generator of (token, tag) tuples.
+        """
+        for sentence in self.sents(timestamp):
+            for token in sentence:
+                yield token
                 
 
 if __name__ == "__main__":
@@ -63,7 +95,7 @@ if __name__ == "__main__":
     counter = 0
     for year in range(2022,2023):
         print("Start reading datas for year {}.".format(year))
-        for i in corpus_reader.docs(year):
+        for i in corpus_reader.words(year):
             counter += 1
         print("Year {}".format(str(year)))
         print("List counter: {}".format(counter))

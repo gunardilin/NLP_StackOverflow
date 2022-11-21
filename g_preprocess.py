@@ -1,14 +1,20 @@
 # Generate preprocessed_html and store in SQLite DB
 
 from f_HTMLCorpusReader import HTMLCorpusReader, SQLiteHtmlJson_Connector
-import datetime
+import time
 
-start_time = datetime.datetime.now()
+start_time = time.time()
 sqlite_handler = SQLiteHtmlJson_Connector()
 corpus_handler = HTMLCorpusReader()
 
+def timer(start,end):
+    hours, rem = divmod(end-start, 3600)
+    minutes, seconds = divmod(rem, 60)
+    print("Runtime: {:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds))
+
 query_list = sqlite_handler.generate_query_batchread(sqlite_handler.tablename,\
     sqlite_handler.sql_from_value)
+query_len = len(query_list)
 print("Start now ...")
 count = 0
 for query in query_list:
@@ -28,8 +34,9 @@ for query in query_list:
         counter += 1
     sqlite_handler.commit()
     count += 1
-    print("Finished with {} commit".format(count))
+    print("Finished with {} out of {} commit".format(count, query_len))
+    timer(start_time, time.time())
+    
 
-duration = start_time - datetime.timedelta(microseconds=start_time.microsecond)
-print("Runtime: {}".format(duration))
+timer(start_time, time.time())
 print("Finished.")

@@ -1,6 +1,7 @@
+# Testing TextNomalizer and GensimVectorizer
 import time
 from h_readsqlite import SqliteCorpusReader
-from i_vectorizer import tokenize, GensimVectorizer, TextNormalizer
+from i_vectorizer import GensimVectorizer, TextNormalizer
 
 start_time = time.time()
 PATH =  "DB/StackOverflow.sqlite"
@@ -11,11 +12,11 @@ normal = TextNormalizer()
 normal.fit(docs)
 
 docs = list(normal.transform(docs))
-vect = GensimVectorizer("other/lexicon.pkl")
+vect = GensimVectorizer("other/lexicon.pkl", True)
 vect.fit(docs)
 docs = vect.transform(docs)
 for i in docs:
-    print(len(i), set(i))
+    print(len(i), i)
 
 print("Finished")
 
