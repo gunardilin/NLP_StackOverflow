@@ -13,7 +13,7 @@ def timer(start,end):
     print("Runtime: {:0>2}:{:0>2}:{:05.2f}".format(int(hours),int(minutes),seconds))
 
 query_list = sqlite_handler.generate_query_batchread(sqlite_handler.tablename,\
-    sqlite_handler.sql_from_value)
+    sqlite_handler.sql_from_value, offset=50*(118+676+577+1867+1826))
 query_len = len(query_list)
 print("Start now ...")
 count = 0

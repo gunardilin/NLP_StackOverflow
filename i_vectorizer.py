@@ -3,6 +3,7 @@ import string
 from collections import Generator
 from sklearn.base import BaseEstimator, TransformerMixin
 import os
+import gensim
 from gensim.corpora import Dictionary
 from gensim.matutils import sparse2full
 import unicodedata
@@ -92,17 +93,24 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
     """Vectorizing each document when self.transform is executed.
     Reason for using Gensim: Gensim Dictionary can be saved to disk.
     It allows reloading the Dictionary without requiring a refit.
-    It could perform either 1) Frequency vectorization or 2) One Hot Encoding.
+    
+    It could perform either 1) Frequency vectorization or 2) One Hot Encoding
+    or 3) TF-IDF
+    1) Frequency vectorization: binary=False, tfidf=True/False
+    2) One Hot Encoding: binary=True, tfidf=True/False
+    3) TF-IDF: binary=False, tfidf=True
     By initializing self.binary=True, One Hot Encoding will be used.
     If self.binary=False, Frequency Vectorization is active. 
     """
-    def __init__(self, path:str=None, binary=False):
+    def __init__(self, path:str=None, binary=False, tfidf=False):
         "path: save location for Dictionary after performing self.fit(...)"
         "Change binary to True to activate One Hot Encoding."
         self.path = path
         self.id2word = None
         self.load()
         self.binary = binary
+        self.tfidf = tfidf
+        self.tfidf_model = None
         self.documents = None
         
     def load(self):
@@ -121,6 +129,8 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         """
         if isinstance(documents, types.GeneratorType):
             self.documents = list(documents)
+        else:
+            self.documents = documents
         self.id2word = Dictionary(self.documents)
         self.save()
         return self
@@ -130,10 +140,13 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         Transforming document vectors so that every document contains exactly 
         "len(self.id2word)" length.
         """
+        if self.tfidf:
+            tfidf_model = gensim.models.TfidfModel(dictionary=self.id2word, \
+                normalize=True)
         for document in self.documents:
             # Applying frequency vectorization:
-            docvec = self.id2word.doc2bow(document)
-            if self.binary: # If True, then use One Hot Encoding.
+            docvec = self.id2word.doc2bow(document) # Mode1: Frequency Vectorization
+            if self.binary: # Mode2: If True: One Hot Encoding.
                 temp = []
                 for index_, frequency in docvec:
                     if frequency > 0:
@@ -142,4 +155,8 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
                         onehot_freq = 0
                     temp.append((index_, onehot_freq))
                 docvec = temp
+            elif self.tfidf: # Mode3: If True: TF-IDF
+                docvec_temp = docvec
+                docvec = tfidf_model[docvec_temp]
+
             yield sparse2full(docvec, len(self.id2word))

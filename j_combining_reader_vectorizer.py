@@ -12,11 +12,16 @@ normal = TextNormalizer()
 normal.fit(docs)
 
 docs = list(normal.transform(docs))
-vect = GensimVectorizer("other/lexicon.pkl", True)
+# vect = GensimVectorizer("other/lexicon.pkl", True) # One Hot Encoding
+vect = GensimVectorizer("other/lexicon.pkl", False, True)
 vect.fit(docs)
 docs = vect.transform(docs)
+n = 0
 for i in docs:
-    print(len(i), i)
+    # print(len(i), i)
+    n += 1
+print(n)
+print(len(i), i)
 
 print("Finished")
 

@@ -21,6 +21,8 @@ class SqliteCorpusReader(SqliteOperation):
         self.tablename = tablename
         self.sql_from_value = sql_from_value
         self.error_counter = 0
+        self.faulty_index = []  # Necessary to store faulty index because of 
+                                # fail parsing during: get_ids_docs
     
     def ids(self, timestamp:str=None):
         """
@@ -33,7 +35,12 @@ class SqliteCorpusReader(SqliteOperation):
         """
         base = base.format(timestamp)
         self.execute_query(base)
-        return list(self.last_cursor)
+        id_list = []
+        for i in self.last_cursor:
+            id_list.append(i[0])
+        for i in reversed(self.faulty_index):
+            id_list.pop(i)
+        return id_list
     
     def docs(self, timestamp:str=None):
         """
@@ -41,7 +48,7 @@ class SqliteCorpusReader(SqliteOperation):
         This uses a generator to acheive memory safe iteration.
         """
         base = """
-        SELECT preprocessed_html
+        SELECT id, preprocessed_html
         FROM preprocessed_datas
         WHERE id IN (
         SELECT id
@@ -52,14 +59,43 @@ class SqliteCorpusReader(SqliteOperation):
         base = base.format(timestamp)
         self.execute_query(base)
         self.error_counter = 0
+        n = 0
         for i in self.last_cursor:
             try:
-                json_str = i[0].replace("['", '["').replace("', '", '", "').\
+                json_str = i[1].replace("['", '["').replace("', '", '", "').\
                     replace("']", '"]').replace("""", \'""", '", "').\
                     replace("\\", "").replace('"[""', '"["').replace('[""]"', '["]"')
                 yield json.loads(json_str)
             except:
                 self.error_counter += 1
+                self.faulty_index.append(n)
+            n += 1
+    
+    # def docs(self, timestamp:str=None):
+    #     """
+    #     Returns the document loaded from Sqlite for every row.
+    #     This uses a generator to acheive memory safe iteration.
+    #     """
+    #     base = """
+    #     SELECT preprocessed_html
+    #     FROM preprocessed_datas
+    #     WHERE id IN (
+    #     SELECT id
+    #     FROM raw_datas
+    #     WHERE creation_date LIKE "{}%"
+    #     )
+    #     """
+    #     base = base.format(timestamp)
+    #     self.execute_query(base)
+    #     self.error_counter = 0
+    #     for i in self.last_cursor:
+    #         try:
+    #             json_str = i[0].replace("['", '["').replace("', '", '", "').\
+    #                 replace("']", '"]').replace("""", \'""", '", "').\
+    #                 replace("\\", "").replace('"[""', '"["').replace('[""]"', '["]"')
+    #             yield json.loads(json_str)
+    #         except:
+    #             self.error_counter += 1
 
     def paras(self, timestamp:str=None):
         """
