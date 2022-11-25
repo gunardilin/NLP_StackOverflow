@@ -1,6 +1,6 @@
 import nltk
 import string
-from collections import Generator
+from collections.abc import Generator
 from sklearn.base import BaseEstimator, TransformerMixin
 import os
 import gensim

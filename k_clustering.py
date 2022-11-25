@@ -5,6 +5,7 @@ import types
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.cluster.hierarchy import dendrogram
+import pandas as pd
 
 from sklearn.cluster import AgglomerativeClustering
 class KMeansClusters(BaseEstimator, TransformerMixin):
@@ -31,13 +32,15 @@ class KMeansClusters(BaseEstimator, TransformerMixin):
         """
         if isinstance(documents, types.GeneratorType):
             documents_ = list(documents)
+        elif isinstance(documents, pd.DataFrame):
+            documents_ = documents.to_numpy()
         else:
             documents_ = documents
         return self.model.cluster(documents_, assign_clusters=True)
     
 class HierarhicalClusters(object):
     def __init__(self):
-        self.model = AgglomerativeClustering()
+        self.model = AgglomerativeClustering(affinity="cosine", linkage="average")
         self.labels = None
         self.children = None
     
@@ -67,7 +70,7 @@ class HierarhicalClusters(object):
             astype(float)
         
         # Plot the corresponding dendrogram
-        fig, ax = plt.subplots(figsize=(10, 5)) # set size
+        fig, ax = plt.subplots(figsize=(20, 10)) # set size
         ax = dendrogram(linkage_matrix, labels=ids)
         plt.tick_params(axis='x', bottom='off', top='off', labelbottom='off')
         plt.xticks(fontsize=14)

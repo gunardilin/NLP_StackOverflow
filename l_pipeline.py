@@ -31,15 +31,15 @@ def pipeline_normalizer_kmeans(path:str, year:int):
     ###
     return pd.DataFrame(clusters, index=ids, columns=['cluster'])
 
-# if __name__ == "__main__":
-#     start_time = time.time()
-#     PATH =  "DB/StackOverflow.sqlite"
+if __name__ == "__main__":
+    start_time = time.time()
+    PATH =  "DB/StackOverflow.sqlite"
     
-#     cluster = pipeline_normalizer_kmeans(PATH, 2021)
-#     timer(start_time, time.time())
-#     xw.view(cluster)
-#     timer(start_time, time.time())
-#     print("Finish")
+    cluster = pipeline_normalizer_kmeans(PATH, 2022)
+    timer(start_time, time.time())
+    xw.view(cluster)
+    timer(start_time, time.time())
+    print("Finish")
 
 def pipeline_normalizer_agglomerative(path:str, year:int):
     corpus_reader = SqliteCorpusReader(path=path)
@@ -56,10 +56,10 @@ def pipeline_normalizer_agglomerative(path:str, year:int):
     ids = corpus_reader.ids(year)
     clusterer.plot_dendrogram(ids)
 
-if __name__ == "__main__":
-    start_time = time.time()
-    PATH =  "DB/StackOverflow.sqlite"
+# if __name__ == "__main__":
+#     start_time = time.time()
+#     PATH =  "DB/StackOverflow.sqlite"
     
-    cluster = pipeline_normalizer_agglomerative(PATH, 2022)
-    timer(start_time, time.time())
-    print("Finish")
+#     cluster = pipeline_normalizer_agglomerative(PATH, 2022)
+#     timer(start_time, time.time())
+#     print("Finish")
