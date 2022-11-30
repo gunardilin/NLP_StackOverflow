@@ -10,6 +10,8 @@ from sklearn.pipeline import Pipeline
 import pandas as pd
 
 import gensim
+import os
+import csv
 
 WIDTH = 800
 HEIGHT = 400
@@ -23,7 +25,7 @@ def wordcloud(word_matrix):
     plt.tight_layout(pad=0)
     plt.show()
 
-def wordcloud_with_cluster(cluster_list, word_matrix):
+def wordcloud_with_cluster(cluster_list, word_matrix, year):
     cluster_set = sorted(set(cluster_list))
     for i in cluster_set:
         index_ = [a for a, x in enumerate(cluster_list) if x == i]
@@ -35,35 +37,78 @@ def wordcloud_with_cluster(cluster_list, word_matrix):
         plt.axis("off")
         plt.imshow(wc, interpolation="bilinear")
         plt.tight_layout(pad=0)
-    plt.show()
+        wc.to_file("other/{}_{}_cluster.png".format(year, i))
+    # plt.show()
     return
-    
 
-def pipeline_normalizer(path:str, year:int):
+def pipeline_normalizer(path:str, lexicon_path:str, year:int):
     corpus_reader = SqliteCorpusReader(path=path)
     docs = corpus_reader.docs(year)
-    
     model = Pipeline([
         ("norm", TextNormalizer()),
-        ("vect", GensimVectorizer("/Users/GunardiLin/Desktop/Project/ProjectStackOverflow/Python/other/lexicon.pkl", False, True))
+        ("vect", GensimVectorizer(lexicon_path, False, True))
     ])
-    
     tfidf = model.fit_transform(docs)
     ids = corpus_reader.ids(year)
     return pd.DataFrame(tfidf, index=ids)
 
+def convert_to_list_of_list(list_:list):
+    """Convert a list to list of list.
+    Input = [1, 2, 3]
+    Output = [[1], [2], [3]]
+    """
+    output_list = []
+    for i in list_:
+        output_list.append([i])
+    return output_list
+
+def write_to_csv(year, data:list):
+    file = open('other/cluster_{}.csv'.format(year), 'w+', newline ='')
+    # writing the data into the file
+    converted_data = convert_to_list_of_list(data)
+    with file:   
+        write = csv.writer(file)
+        write.writerows(converted_data)
+    return
+
+def pipeline_normalizer_wordcloud(path, lexicon_path, year):
+    # Delete existing lexicon to keep the matrix as small as possible
+    if os.path.exists(lexicon_path):
+        os.remove(lexicon_path)
+        print("Existing lexicon deleted...")
+    else:
+        print("No existing lexicon.")
+    tfidf_matrix = pipeline_normalizer(path, lexicon_path, year)
+    lexicon = gensim.corpora.Dictionary.load(lexicon_path)
+    tfidf_matrix.columns = list(lexicon.token2id.keys())
+    clusterer = KMeansClusters()
+    cluster_list = clusterer.transform(tfidf_matrix)
+    write_to_csv(year, cluster_list)
+    wordcloud_with_cluster(cluster_list, tfidf_matrix, year)
+    print("Finish executing pipeline_normalizer_workcloud")
+    return
+    
 if __name__ == "__main__":
     start_time = time.time()
     PATH =  "DB/StackOverflow.sqlite"
     LEXICON_PATH = "/Users/GunardiLin/Desktop/Project/ProjectStackOverflow/Python/other/lexicon.pkl"
-    YEAR = 2022
-    tfidf_matrix = pipeline_normalizer(PATH, YEAR)
-    lexicon = gensim.corpora.Dictionary.load(LEXICON_PATH)
-    tfidf_matrix.columns = list(lexicon.token2id.keys())
-    clusterer = KMeansClusters()
-    cluster_list = clusterer.transform(tfidf_matrix)
-    wordcloud_with_cluster(cluster_list, tfidf_matrix)
+    YEAR = 2021
+    # print("1")
+    # tfidf_matrix = pipeline_normalizer(PATH, LEXICON_PATH, YEAR)
+    # print("2")
+    # lexicon = gensim.corpora.Dictionary.load(LEXICON_PATH)
+    # print("3")
+    # tfidf_matrix.columns = list(lexicon.token2id.keys())
+    # print("4")
+    # clusterer = KMeansClusters()
+    # print("5")
+    # cluster_list = clusterer.transform(tfidf_matrix)
+    # print("6")
+    # wordcloud_with_cluster(cluster_list, tfidf_matrix)
+    # print("7")
     # timer(start_time, time.time())
     # xw.view(cluster)
-    # timer(start_time, time.time())
-    print("Finish")
+    ###
+    pipeline_normalizer_wordcloud(PATH, LEXICON_PATH, YEAR)
+    timer(start_time, time.time())
+    

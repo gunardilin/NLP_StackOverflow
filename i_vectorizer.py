@@ -132,6 +132,7 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         else:
             self.documents = documents
         self.id2word = Dictionary(self.documents)
+        self.id2word.filter_extremes(no_below=20)
         self.save()
         return self
     
