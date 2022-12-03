@@ -91,7 +91,7 @@ def pipeline_normalizer_wordcloud(path, lexicon_path, year):
 if __name__ == "__main__":
     start_time = time.time()
     PATH =  "DB/StackOverflow.sqlite"
-    LEXICON_PATH = "/Users/GunardiLin/Desktop/Project/ProjectStackOverflow/Python/other/lexicon.pkl"
+    LEXICON_PATH = "other/lexicon.pkl"
     YEAR = 2021
     # print("1")
     # tfidf_matrix = pipeline_normalizer(PATH, LEXICON_PATH, YEAR)
