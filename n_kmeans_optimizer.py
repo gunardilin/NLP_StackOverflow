@@ -44,11 +44,14 @@ def elbow_method(path:str, lexicon_path:str, year:int, end_year:int=None,\
         # B.1 Get all centroid coordinates
         centroids = clusterer.get_centroids()
         # B.2 Calculate sum squared error (SSE) for each centroid
+        temp_list = []
         for cluster_x in unique_cluster:
             temp_array = pairwise_distances([centroids[cluster_x]], \
                 tfidf_matrix.iloc[cluster_index[cluster_x]].to_numpy(), metric=metric)
+            temp_list.append(np.sum(temp_array))
             
-        sum_squared_error_for_n_cluster[i] = np.sum(temp_array)/2
+        sum_squared_error_for_n_cluster[i] = sum(temp_list) / 2
+        # Divided by 2 because the elbow matrix is reflected at its diagonal.
         print("**Cluster:")
         timer(temp_time, time.time())
         timer(start_time, time.time())
@@ -68,4 +71,4 @@ def elbow_method(path:str, lexicon_path:str, year:int, end_year:int=None,\
     return
 
 if __name__ == "__main__":
-    elbow_method(PATH, LEXICON_PATH, 2022, max_clusters=20)
+    elbow_method(PATH, LEXICON_PATH, 2022, max_clusters=50)
