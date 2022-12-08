@@ -8,6 +8,7 @@ import time
 from l_pipeline import timer
 
 from sklearn.metrics.pairwise import pairwise_distances
+from sklearn import metrics
 
 PATH =  "DB/StackOverflow.sqlite"
 LEXICON_PATH = "other/lexicon.pkl"
@@ -70,5 +71,49 @@ def elbow_method(path:str, lexicon_path:str, year:int, end_year:int=None,\
     
     return
 
+def silhouette_score(path:str, lexicon_path:str, year:int, end_year:int=None,\
+    max_clusters:int=10, metric="cosine"):
+    start_time = time.time()
+    # Delete existing lexicon to keep the matrix as small as possible
+    if os.path.exists(lexicon_path):
+        os.remove(lexicon_path)
+        print("Existing lexicon deleted...")
+    else:
+        print("No existing lexicon.")
+    print("Generating tfidf matrix")
+    tfidf_matrix = pipeline_normalizer(path, lexicon_path, year)
+    lexicon = gensim.corpora.Dictionary.load(lexicon_path)
+    tfidf_matrix.columns = list(lexicon.token2id.keys())
+    # Initiate cluster range
+    cluster_range = range(2, max_clusters+1)
+    silhouette_score_for_n_cluster = {}
+    for i in cluster_range:
+        print("Calculating Silhouette Coefficient for {} clusters...".format(str(i)))
+        temp_time = time.time()
+        clusterer = KMeansClusters(k=i)
+        cluster_list = clusterer.transform(tfidf_matrix)
+        current_score = metrics.silhouette_score(tfidf_matrix, \
+            cluster_list, metric=metric)
+        silhouette_score_for_n_cluster[i] = current_score
+        print("**Cluster:")
+        timer(temp_time, time.time())
+        timer(start_time, time.time())
+    print("Generating silhouette coefficient graph...")
+    plt.style.use("fivethirtyeight")
+    plt.plot(silhouette_score_for_n_cluster.keys(), \
+        silhouette_score_for_n_cluster.values())
+    plt.xticks(list(silhouette_score_for_n_cluster.keys()))
+    plt.xlabel("Number of Clusters")
+    plt.ylabel("Silhouette Coefficient")
+    figure = plt.gcf()
+    figure.set_size_inches(10, 8)
+    plt.savefig('other/silhouette_methode_{}_{}_clusters.png'.format(year, max_clusters),\
+        bbox_inches='tight', dpi=100)
+    plt.show()
+    
+    return
+
+
 if __name__ == "__main__":
-    elbow_method(PATH, LEXICON_PATH, 2022, max_clusters=50)
+    # elbow_method(PATH, LEXICON_PATH, 2022, max_clusters=10)
+    silhouette_score(PATH, LEXICON_PATH, 2022, max_clusters=100)
