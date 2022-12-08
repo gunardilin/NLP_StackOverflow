@@ -41,7 +41,17 @@ def wordcloud_with_cluster(cluster_list, word_matrix, year):
     # plt.show()
     return
 
-def pipeline_normalizer(path:str, lexicon_path:str, year:int):
+def pipeline_normalizer(path:str, lexicon_path:str, year:int) -> pd.DataFrame:
+    """ Perform Lemmatization and Vectorization.
+
+    Args:
+        path (str): SQL path
+        lexicon_path (str): Gensim Lexicon path
+        year (int): year 
+
+    Returns:
+        pd.DataFrame: tfidf dataframe with document id as index
+    """
     corpus_reader = SqliteCorpusReader(path=path)
     docs = corpus_reader.docs(year)
     model = Pipeline([
@@ -93,22 +103,6 @@ if __name__ == "__main__":
     PATH =  "DB/StackOverflow.sqlite"
     LEXICON_PATH = "other/lexicon.pkl"
     YEAR = 2021
-    # print("1")
-    # tfidf_matrix = pipeline_normalizer(PATH, LEXICON_PATH, YEAR)
-    # print("2")
-    # lexicon = gensim.corpora.Dictionary.load(LEXICON_PATH)
-    # print("3")
-    # tfidf_matrix.columns = list(lexicon.token2id.keys())
-    # print("4")
-    # clusterer = KMeansClusters()
-    # print("5")
-    # cluster_list = clusterer.transform(tfidf_matrix)
-    # print("6")
-    # wordcloud_with_cluster(cluster_list, tfidf_matrix)
-    # print("7")
-    # timer(start_time, time.time())
-    # xw.view(cluster)
-    ###
     pipeline_normalizer_wordcloud(PATH, LEXICON_PATH, YEAR)
     timer(start_time, time.time())
     

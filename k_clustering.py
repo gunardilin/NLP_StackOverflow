@@ -38,6 +38,9 @@ class KMeansClusters(BaseEstimator, TransformerMixin):
             documents_ = documents
         return self.model.cluster(documents_, assign_clusters=True)
     
+    def get_centroids(self):
+        return self.model.means()
+    
 class HierarhicalClusters(object):
     def __init__(self):
         self.model = AgglomerativeClustering(affinity="cosine", linkage="average")
