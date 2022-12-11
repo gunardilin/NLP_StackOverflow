@@ -24,14 +24,15 @@ class Estimator(object):
         self.estimator.fit_transform(list(documents))
         
 class SklearnTopicModels(object):
-    def __init__(self, n_topics=50, db_path:str="DB/StackOverflow.sqlite", \
+    def __init__(self, n_topics=50, estimator="LDA", \
+        db_path:str="DB/StackOverflow.sqlite", \
         gensim_lexicon:str="other/lexicon.pkl"):
         self.n_topics = n_topics
         self.corpus_reader = SqliteCorpusReader(path=db_path)
         self.model = Pipeline([
             ("norm", TextNormalizer()),
             ("vect", GensimVectorizer(gensim_lexicon, False, True)),
-            ("model", Estimator(self.n_topics, "LDA"))
+            ("model", Estimator(self.n_topics, estimator))
         ])
     
     def fit_transform(self, year:int):
@@ -60,8 +61,8 @@ class SklearnTopicModels(object):
 
 if __name__ == "__main__":
     start_time = time.time()
-    skmodel = SklearnTopicModels(n_topics=50)
-    skmodel.fit_transform(2021)
+    skmodel = SklearnTopicModels(n_topics=50, estimator="NMF")
+    skmodel.fit_transform(2022)
     topics = skmodel.get_topics()
     for topic, term in topics.items():
         print("Topic #{}:".format(topic+1))
