@@ -219,7 +219,7 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
         self.save()
         return self
     
-    def transform(self, documents:list) -> Generator[np.ndarray]:
+    def transform(self, documents:list) -> list:
         """
         Transforming document vectors so that every document contains exactly 
         "len(self.id2word)" length.
