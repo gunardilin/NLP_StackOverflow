@@ -3,7 +3,7 @@ from h_readsqlite import SqliteCorpusReader
 from i_vectorizer import TextNormalizer, GensimVectorizer, GensimVectorizer_Topic_Discovery
 from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 
-from gensim.models import LsiModel
+from gensim.models import LsiModel, LdaModel
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
 
@@ -13,6 +13,9 @@ from l_pipeline import timer
 import pyLDAvis
 import pyLDAvis.sklearn
 import pyLDAvis.gensim_models
+
+import os
+import warnings
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -83,22 +86,36 @@ class GensimTopicModels(object):
     def __init__(self, n_topics=20, estimator="LDA", \
         db_path:str="DB/StackOverflow.sqlite", \
         gensim_lexicon:str="other/lexicon.pkl"):
+        self.estimator = estimator
         self.corpus_reader = SqliteCorpusReader(path=db_path)     
         self.n_topics = n_topics
         self.docs = []
         self.doc_matrix = None
         self.id2word = None
+        self.model_filepath = "other/model/{}_model".format(estimator)
 
         if estimator == 'LSA':
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         else:
             self.estimator = LdaTransformer(num_topics=self.n_topics)
+        self.load_model()
         
         self.model = Pipeline([
             ("norm", TextNormalizer()),
             ("vect", GensimVectorizer_Topic_Discovery(gensim_lexicon, False, True)),
-            # ("model", self.estimator),
         ])
+    
+    def save_model(self):
+        self.estimator.gensim_model.save(self.model_filepath)
+        return
+    
+    def load_model(self):
+        if os.path.exists(self.model_filepath):
+            if self.estimator == "LDA":
+                self.estimator.gensim_model = LdaModel.load(self.model_filepath)
+            elif self.estimator == "LSI":
+                self.estimator.gensim_model = LsiModel.load(self.model_filepath)
+        return
     
     def fit(self, year:int):
         docs = self.corpus_reader.docs(year)
@@ -106,7 +123,8 @@ class GensimTopicModels(object):
         self.doc_matrix = self.model.fit_transform(self.docs)
         vectorizer = self.model.named_steps['vect']
         self.estimator.id2word = vectorizer.id2word.id2token
-        self.estimator.fit(self.doc_matrix)
+        self.estimator.partial_fit(self.doc_matrix)
+        self.save_model()
         return self.model
     
     def get_topics(self, n_words=25):
@@ -119,11 +137,16 @@ class GensimTopicModels(object):
         return topics
     
     def visualize_topics(self):
+        if self.estimator != "LDA":
+            print("** The pyLDAvis is only compatible for LDA not the currently used model.")
+            return
         lda_model = self.estimator.gensim_model
         corpus = self.doc_matrix
         lexicon = self.model.named_steps['vect'].id2word
-        data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
-        pyLDAvis.save_html(data, 'other/lda.html')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
+            pyLDAvis.save_html(data, 'other/lda.html')
         return data
         
         
@@ -145,7 +168,7 @@ if __name__ == "__main__":
     ## With Gensim
     start_time = time.time()
     model = GensimTopicModels(n_topics=50, estimator="LDA")
-    model.fit(2021)
+    model.fit(2022)
     # print(model.estimator.gensim_model.print_topics(10))
     topics = model.get_topics()
     n = 0
