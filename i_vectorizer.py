@@ -214,7 +214,10 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
             self.documents = list(documents)
         else:
             self.documents = documents
-        self.id2word = Dictionary(self.documents)
+        if self.id2word == None:
+            self.id2word = Dictionary(self.documents)
+        else:
+            self.id2word.add_documents(self.documents)
         self.id2word.filter_extremes(no_below=20)
         self.save()
         return self

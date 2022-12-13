@@ -6,6 +6,8 @@ from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 from gensim.models import LsiModel, LdaModel
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
+from gensim.corpora.dictionary import Dictionary
+from gensim import corpora
 
 import time
 from l_pipeline import timer
@@ -16,6 +18,9 @@ import pyLDAvis.gensim_models
 
 import os
 import warnings
+import sys
+import pickle
+import itertools
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -85,20 +90,25 @@ class SklearnTopicModels(object):
 class GensimTopicModels(object):
     def __init__(self, n_topics=20, estimator="LDA", \
         db_path:str="DB/StackOverflow.sqlite", \
-        gensim_lexicon:str="other/lexicon.pkl"):
-        self.estimator = estimator
+        gensim_lexicon:str="other/model/lexicon.pkl"):
+        self.lexicon_path = gensim_lexicon
+        self.estimator_str = estimator
         self.corpus_reader = SqliteCorpusReader(path=db_path)     
         self.n_topics = n_topics
         self.docs = []
         self.doc_matrix = None
         self.id2word = None
-        self.model_filepath = "other/model/{}_model".format(estimator)
+        self.model_folderpath = "other/model"
+        self.model_filepath = "{}/{}_model".format(self.model_folderpath, estimator)
+        self.tempFolderPath = "other/temp"
+        self.doc_matrix_pickle_path = "{}/temp.pickle".format(self.tempFolderPath)
+        self.remove_temp([self.doc_matrix_pickle_path, gensim_lexicon])
 
         if estimator == 'LSA':
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         else:
             self.estimator = LdaTransformer(num_topics=self.n_topics)
-        self.load_model()
+        # self.load_model()
         
         self.model = Pipeline([
             ("norm", TextNormalizer()),
@@ -106,6 +116,8 @@ class GensimTopicModels(object):
         ])
     
     def save_model(self):
+        if not os.path.exists(self.model_folderpath):
+            os.makedirs(self.model_folderpath)
         self.estimator.gensim_model.save(self.model_filepath)
         return
     
@@ -121,11 +133,90 @@ class GensimTopicModels(object):
         docs = self.corpus_reader.docs(year)
         self.docs = list(docs)
         self.doc_matrix = self.model.fit_transform(self.docs)
+        self.docs = None                # Free up memory
         vectorizer = self.model.named_steps['vect']
+        vectorizer.documents = None     # Free up memory
         self.estimator.id2word = vectorizer.id2word.id2token
         self.estimator.partial_fit(self.doc_matrix)
         self.save_model()
         return self.model
+    
+    def fit_multi_years(self, start_year:int, end_year:int):
+        for year in range(start_year, end_year+1):
+            print("Processing corpus from Y{}".format(year))
+            docs = self.corpus_reader.docs(year)
+            self.docs = list(docs)
+            self.doc_matrix = self.model.fit_transform(self.docs)
+            self.docs = None                # Free up memory
+            vectorizer = self.model.named_steps['vect']
+            vectorizer.documents = None     # Free up memory
+            self.id2word = Dictionary.load(self.lexicon_path)
+            
+            # if self.estimator_str == 'LSA':
+            #     self.estimator = LsiTransformer(num_topics=self.n_topics)
+            # else:
+            #     self.estimator = LdaTransformer(num_topics=self.n_topics)
+            self.id2word = vectorizer.id2word.id2token
+            self.estimator.id2word = self.id2word
+            
+            # if self.id2word == None:
+            #     self.id2word = vectorizer.id2word.id2token
+            # else:
+            #     # combining existing and new lexicon
+            #     list_a = list(self.id2word.values())
+            #     list_b = list(vectorizer.id2word.id2token.values())
+            #     lists = (list_a, list_b)
+            #     combined_unique_list = []
+            #     for x in itertools.chain.from_iterable(lists):
+            #         if x not in combined_unique_list:
+            #             combined_unique_list.append(x)
+            #     new_id2word_dict = {}
+            #     for n, i in enumerate(combined_unique_list):
+            #         new_id2word_dict[n] = i
+            #     # save new lexicon as new id2word
+            #     self.id2word = new_id2word_dict
+            #     # cleaning to free up memory
+            #     del list_a, list_b, lists, combined_unique_list
+            
+            # if self.estimator.id2word == None:
+            #     self.estimator.id2word = self.id2word
+            # else:
+            #     self.estimator.gensim_model.id2word = self.id2word
+            #     self.estimator.gensim_model.num_terms = len(list(self.id2word.values()))
+            self.estimator.partial_fit(self.doc_matrix)
+            self.save_doc_matrix_to_pickle(self.doc_matrix)
+            self.doc_matrix = None
+        # self.doc_matrix = self.load_from_pickle(self.doc_matrix_pickle_path)
+        self.save_model()
+        return self.model
+    
+    def save_doc_matrix_to_pickle(self, data):
+        if not os.path.exists(self.tempFolderPath):
+            os.makedirs(self.tempFolderPath)
+        with open(self.doc_matrix_pickle_path,"ab") as f:
+            pickle.dump(data, f)
+        print("Data is saved into pickle.")
+        return
+    
+    def load_from_pickle(self, path):
+        def loader(fp):
+            # a load iter
+            while True:
+                try:
+                    yield pickle.load(fp)
+                except EOFError:
+                    print("Generator is exhausted")
+                    break
+        with open(path, "rb") as f:
+            for i in loader(f):
+                yield(i)
+        return
+    
+    def remove_temp(self, path_list:list):
+        for filePath in path_list:
+            if os.path.exists(filePath):
+                os.remove(filePath)
+        return
     
     def get_topics(self, n_words=25):
         names = self.estimator.id2word
@@ -136,13 +227,37 @@ class GensimTopicModels(object):
             topics[idx] = tokens
         return topics
     
+    # def visualize_topics(self):
+    #     if self.estimator_str != "LDA":
+    #         print("** The pyLDAvis is only compatible for LDA not the currently used model.")
+    #         return
+    #     lda_model = self.estimator.gensim_model
+    #     temp_list = self.load_from_pickle(self.doc_matrix_pickle_path)
+        
+    #     corpus = []
+    #     for i in temp_list:
+    #         corpus += i
+    #     del temp_list   # Free up memory
+    #     lexicon = Dictionary()
+    #     lexicon.token2id = self.estimator.id2word
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter('ignore')
+    #         data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
+    #         pyLDAvis.save_html(data, 'other/lda.html')
+    #     return data
+    
     def visualize_topics(self):
-        if self.estimator != "LDA":
+        if self.estimator_str != "LDA":
             print("** The pyLDAvis is only compatible for LDA not the currently used model.")
             return
         lda_model = self.estimator.gensim_model
-        corpus = self.doc_matrix
-        lexicon = self.model.named_steps['vect'].id2word
+        temp_list = self.load_from_pickle(self.doc_matrix_pickle_path)
+        corpus = []
+        for i in temp_list:
+            corpus += i
+        #lexicon = self.model.named_steps['vect'].id2word
+        #lexicon = lda_model.id2word
+        lexicon = Dictionary.load(self.lexicon_path)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
@@ -165,10 +280,25 @@ if __name__ == "__main__":
     # timer(start_time, time.time())
     
     
-    ## With Gensim
+    ## With Gensim for single year
+    # start_time = time.time()
+    # model = GensimTopicModels(n_topics=50, estimator="LDA")
+    # model.fit(2022)
+    # # print(model.estimator.gensim_model.print_topics(10))
+    # topics = model.get_topics()
+    # n = 0
+    # for topic in topics.values():
+    #     n += 1
+    #     print("Topic #{}:".format(n))
+    #     print(topic)
+    # model.visualize_topics()
+    # timer(start_time, time.time())
+    
+
+    ## With Gensim for multi years
     start_time = time.time()
     model = GensimTopicModels(n_topics=50, estimator="LDA")
-    model.fit(2022)
+    model.fit_multi_years(start_year=2021, end_year=2022)
     # print(model.estimator.gensim_model.print_topics(10))
     topics = model.get_topics()
     n = 0
