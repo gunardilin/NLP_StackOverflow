@@ -143,50 +143,19 @@ class GensimTopicModels(object):
     
     def fit_multi_years(self, start_year:int, end_year:int):
         for year in range(start_year, end_year+1):
-            print("Processing corpus from Y{}".format(year))
+            print("Reading corpus from Y{}".format(year))
             docs = self.corpus_reader.docs(year)
-            self.docs = list(docs)
-            self.doc_matrix = self.model.fit_transform(self.docs)
-            self.docs = None                # Free up memory
-            vectorizer = self.model.named_steps['vect']
-            vectorizer.documents = None     # Free up memory
-            self.id2word = Dictionary.load(self.lexicon_path)
-            
-            # if self.estimator_str == 'LSA':
-            #     self.estimator = LsiTransformer(num_topics=self.n_topics)
-            # else:
-            #     self.estimator = LdaTransformer(num_topics=self.n_topics)
-            self.id2word = vectorizer.id2word.id2token
-            self.estimator.id2word = self.id2word
-            
-            # if self.id2word == None:
-            #     self.id2word = vectorizer.id2word.id2token
-            # else:
-            #     # combining existing and new lexicon
-            #     list_a = list(self.id2word.values())
-            #     list_b = list(vectorizer.id2word.id2token.values())
-            #     lists = (list_a, list_b)
-            #     combined_unique_list = []
-            #     for x in itertools.chain.from_iterable(lists):
-            #         if x not in combined_unique_list:
-            #             combined_unique_list.append(x)
-            #     new_id2word_dict = {}
-            #     for n, i in enumerate(combined_unique_list):
-            #         new_id2word_dict[n] = i
-            #     # save new lexicon as new id2word
-            #     self.id2word = new_id2word_dict
-            #     # cleaning to free up memory
-            #     del list_a, list_b, lists, combined_unique_list
-            
-            # if self.estimator.id2word == None:
-            #     self.estimator.id2word = self.id2word
-            # else:
-            #     self.estimator.gensim_model.id2word = self.id2word
-            #     self.estimator.gensim_model.num_terms = len(list(self.id2word.values()))
-            self.estimator.partial_fit(self.doc_matrix)
-            self.save_doc_matrix_to_pickle(self.doc_matrix)
-            self.doc_matrix = None
-        # self.doc_matrix = self.load_from_pickle(self.doc_matrix_pickle_path)
+            self.docs += list(docs)
+        print("Variable size: {}".format(sys.getsizeof(self.docs)))
+        del docs                        # Free up memory
+        self.doc_matrix = self.model.fit_transform(self.docs)
+        self.docs = None                # Free up memory
+        vectorizer = self.model.named_steps['vect']
+        vectorizer.documents = None     # Free up memory
+        self.estimator.id2word = vectorizer.id2word.id2token
+        self.estimator.partial_fit(self.doc_matrix)
+        self.save_doc_matrix_to_pickle(self.doc_matrix)
+        self.doc_matrix = None
         self.save_model()
         return self.model
     
@@ -298,7 +267,7 @@ if __name__ == "__main__":
     ## With Gensim for multi years
     start_time = time.time()
     model = GensimTopicModels(n_topics=50, estimator="LDA")
-    model.fit_multi_years(start_year=2021, end_year=2022)
+    model.fit_multi_years(start_year=2011, end_year=2021)
     # print(model.estimator.gensim_model.print_topics(10))
     topics = model.get_topics()
     n = 0
