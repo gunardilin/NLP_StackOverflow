@@ -49,6 +49,10 @@ class TextNormalizer(BaseEstimator, TransformerMixin):
         """ Detecting stopwords: a, in, of and more..."""
         return token.lower() in self.stopwords
     
+    def is_one_character(self, token):
+        """ Detecting one character token: a, b, 1, 2, ..."""
+        return len(token)==1
+    
     def lemmatize(self, token:str, pos_tag:str) -> str:
         """ Perform lemmatization.
         Examples of lemmatization:
