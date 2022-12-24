@@ -136,3 +136,4 @@ test.py
 temp/*
 Credentials/*
 DB/*
+archive/*

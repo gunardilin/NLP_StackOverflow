@@ -3,7 +3,7 @@ from h_readsqlite import SqliteCorpusReader
 from i_vectorizer import TextNormalizer, GensimVectorizer, GensimVectorizer_Topic_Discovery
 from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 
-from gensim.models import LsiModel, LdaModel
+from gensim.models import LsiModel, LdaModel, EnsembleLda
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
 from gensim.corpora.dictionary import Dictionary
@@ -21,6 +21,15 @@ import warnings
 import sys
 import pickle
 import itertools
+
+import logging
+# logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+# Logging for debug purpose:
+gensim_logfile_path = 'other/temp/gensim_logs.log'
+logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
+                   level=logging.DEBUG,
+                   filename=gensim_logfile_path)
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -106,8 +115,11 @@ class GensimTopicModels(object):
 
         if estimator == 'LSA':
             self.estimator = LsiTransformer(num_topics=self.n_topics)
-        else:
-            self.estimator = LdaTransformer(num_topics=self.n_topics)
+        elif estimator == 'LDA':
+            self.estimator = LdaTransformer(num_topics=self.n_topics, \
+                eval_every=10, passes=10, iterations=5000)
+        elif estimator == 'ensembleLDA':
+            self.estimator = "ensembleLDA"
         # self.load_model()
         
         self.model = Pipeline([
@@ -118,7 +130,10 @@ class GensimTopicModels(object):
     def save_model(self):
         if not os.path.exists(self.model_folderpath):
             os.makedirs(self.model_folderpath)
-        self.estimator.gensim_model.save(self.model_filepath)
+        if self.estimator_str == 'ensembleLDA':
+            self.estimator.save(self.model_filepath)
+        elif self.estimator_str == 'LDA' or self.estimator_str == 'LSA':
+            self.estimator.gensim_model.save(self.model_filepath)
         return
     
     def load_model(self):
@@ -145,15 +160,42 @@ class GensimTopicModels(object):
         for year in range(start_year, end_year+1):
             print("Reading corpus from Y{}".format(year))
             docs = self.corpus_reader.docs(year)
-            self.docs += list(docs)
+            self.docs += list(docs)      
         print("Variable size: {}".format(sys.getsizeof(self.docs)))
         del docs                        # Free up memory
         self.doc_matrix = self.model.fit_transform(self.docs)
         self.docs = None                # Free up memory
         vectorizer = self.model.named_steps['vect']
         vectorizer.documents = None     # Free up memory
-        self.estimator.id2word = vectorizer.id2word.id2token
-        self.estimator.partial_fit(self.doc_matrix)
+        if self.estimator != "ensembleLDA":
+            self.estimator.id2word = vectorizer.id2word.id2token
+            self.estimator.partial_fit(self.doc_matrix)
+        elif self.estimator == "ensembleLDA":
+            corpus = self.doc_matrix
+            dictionary = vectorizer.id2word.id2token
+            topic_model_class = LdaModel
+            ensemble_workers = 4
+            num_models = 12
+            distance_workers = 4
+            num_topics = self.n_topics
+            passes=20
+            iterations=5000
+            epsilon = 1
+            eval_every=10
+            
+            self.estimator = EnsembleLda(
+                corpus=corpus,
+                id2word=dictionary,
+                num_topics=num_topics,
+                passes=passes,
+                iterations=iterations,
+                num_models=num_models,
+                topic_model_class=topic_model_class,
+                ensemble_workers=ensemble_workers,
+                distance_workers=distance_workers,
+                epsilon=epsilon,
+                eval_every=eval_every
+            )
         self.save_doc_matrix_to_pickle(self.doc_matrix)
         self.doc_matrix = None
         self.save_model()
@@ -188,9 +230,14 @@ class GensimTopicModels(object):
         return
     
     def get_topics(self, n_words=25):
+        print('*** Getting topics...')
         names = self.estimator.id2word
         topics = dict()
-        for idx, topic in enumerate (self.estimator.gensim_model.get_topics()):
+        if self.estimator_str == "ensembleLDA":
+            get_topics = self.estimator.get_topics()
+        elif self.estimator_str != "ensembleLDA":
+            get_topics = self.estimator.gensim_model.get_topics()
+        for idx, topic in enumerate (get_topics):
             features = topic.argsort()[:-(n_words-1): -1]
             tokens = [names[i] for i in features]
             topics[idx] = tokens
@@ -232,6 +279,38 @@ class GensimTopicModels(object):
             data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
             pyLDAvis.save_html(data, 'other/lda.html')
         return data
+    
+    def optimize_ensembleLda(self):
+        print('*** Optimize ensemble LDA model.')
+        import numpy as np
+        shape = self.estimator.asymmetric_distance_matrix.shape
+        without_diagonal = self.estimator.asymmetric_distance_matrix[~np.eye(shape[0], dtype=bool)].reshape(shape[0], -1)
+        
+        print("Min, mean & max value of asymetric distance matrix:")
+        print(without_diagonal.min(), without_diagonal.mean(), without_diagonal.max())
+        
+        new_epsilon = without_diagonal.max()
+        self.estimator.recluster(eps=new_epsilon, min_samples=2, min_cores=2)
+        return 
+    
+    def parse_logfile(self):
+        import re
+        import matplotlib.pyplot as plt
+        p = re.compile("(-*\d+\.\d+) per-word .* (\d+\.\d+) perplexity")
+        matches = [p.findall(l) for l in open(gensim_logfile_path)]
+        matches = [m for m in matches if len(m) > 0]
+        tuples = [t[0] for t in matches]
+        perplexity = [float(t[1]) for t in tuples]
+        liklihood = [float(t[0]) for t in tuples]
+        iter = list(range(0,len(tuples)*10,10))
+        plt.plot(iter,liklihood,c="black")
+        plt.ylabel("log liklihood")
+        plt.xlabel("iteration")
+        plt.title("Topic Model Convergence")
+        plt.grid()
+        plt.savefig("other/convergence_likelihood.pdf")
+        plt.close()
+        return
         
         
 
@@ -266,9 +345,10 @@ if __name__ == "__main__":
 
     ## With Gensim for multi years
     start_time = time.time()
-    model = GensimTopicModels(n_topics=50, estimator="LDA")
-    model.fit_multi_years(start_year=2011, end_year=2021)
+    model = GensimTopicModels(n_topics=50, estimator="ensembleLDA")
+    model.fit_multi_years(start_year=2021, end_year=2021)
     # print(model.estimator.gensim_model.print_topics(10))
+    model.optimize_ensembleLda()
     topics = model.get_topics()
     n = 0
     for topic in topics.values():
@@ -276,4 +356,5 @@ if __name__ == "__main__":
         print("Topic #{}:".format(n))
         print(topic)
     model.visualize_topics()
+    model.parse_logfile()
     timer(start_time, time.time())
