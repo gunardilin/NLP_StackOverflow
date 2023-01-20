@@ -3,7 +3,8 @@ from h_readsqlite import SqliteCorpusReader
 from i_vectorizer import TextNormalizer, GensimVectorizer, GensimVectorizer_Topic_Discovery
 from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 
-from gensim.models import LsiModel, LdaModel, EnsembleLda
+from gensim.models import LsiModel, LdaModel#, EnsembleLda
+from o_debug import EnsembleLda
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
 from gensim.corpora.dictionary import Dictionary
@@ -171,14 +172,18 @@ class GensimTopicModels(object):
             self.estimator.id2word = vectorizer.id2word.id2token
             self.estimator.partial_fit(self.doc_matrix)
         elif self.estimator == "ensembleLDA":
+            
+            # # Increase max recursion limit. Necessary for EnsembleLda.
+            # sys.setrecursionlimit(2500)
+            
             corpus = self.doc_matrix
             dictionary = vectorizer.id2word.id2token
             topic_model_class = LdaModel
             ensemble_workers = 4
-            num_models = 12
-            distance_workers = 4
+            num_models = 40
+            distance_workers = None
             num_topics = self.n_topics
-            passes=20
+            passes=50
             iterations=5000
             epsilon = 1
             eval_every=10
@@ -280,7 +285,7 @@ class GensimTopicModels(object):
             pyLDAvis.save_html(data, 'other/lda.html')
         return data
     
-    def optimize_ensembleLda(self):
+    def optimize_ensembleLda(self, new_epsilon="max"):
         print('*** Optimize ensemble LDA model.')
         import numpy as np
         shape = self.estimator.asymmetric_distance_matrix.shape
@@ -289,7 +294,10 @@ class GensimTopicModels(object):
         print("Min, mean & max value of asymetric distance matrix:")
         print(without_diagonal.min(), without_diagonal.mean(), without_diagonal.max())
         
-        new_epsilon = without_diagonal.max()
+        if new_epsilon=="max":
+            new_epsilon = without_diagonal.max()
+        elif type(new_epsilon) == int:
+            new_epsilon = new_epsilon
         self.estimator.recluster(eps=new_epsilon, min_samples=2, min_cores=2)
         return 
     
@@ -346,7 +354,7 @@ if __name__ == "__main__":
     ## With Gensim for multi years
     start_time = time.time()
     model = GensimTopicModels(n_topics=50, estimator="ensembleLDA")
-    model.fit_multi_years(start_year=2021, end_year=2021)
+    model.fit_multi_years(start_year=2022, end_year=2022)
     # print(model.estimator.gensim_model.print_topics(10))
     model.optimize_ensembleLda()
     topics = model.get_topics()
