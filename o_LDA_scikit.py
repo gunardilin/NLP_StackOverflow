@@ -99,7 +99,7 @@ class SklearnTopicModels(object):
         return
 
 class GensimTopicModels(object):
-    def __init__(self, n_topics=20, estimator="LDA", \
+    def __init__(self, n_topics=10, estimator="LDA", \
         db_path:str="DB/StackOverflow.sqlite", \
         gensim_lexicon:str="other/model/lexicon.pkl"):
         self.lexicon_path = gensim_lexicon
@@ -119,7 +119,7 @@ class GensimTopicModels(object):
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         elif estimator == 'LDA':
             self.estimator = LdaTransformer(num_topics=self.n_topics, \
-                eval_every=None, passes=10, iterations=5000)
+                eval_every=None, passes=20, iterations=400)
         elif estimator == 'ensembleLDA':
             self.estimator = "ensembleLDA"
         # self.load_model()

@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 NO_BELOW = 20
 LANGUAGE = "english"
-THRESHOLD_NGRAM = 5
+THRESHOLD_NGRAM = 1
 
 def tokenize(text:str, language:str=LANGUAGE)-> Generator[str]:
     """Remove affixes, e.g. plurality, -"ing", -"tion", etc.
@@ -81,14 +81,17 @@ class TextNormalizer(BaseEstimator, TransformerMixin):
         return self.lemmatizer.lemmatize(token, tag)
     
     def normalize(self, document):
-        return [
-            self.lemmatize(token, tag).lower()
-            for paragraph in document
-            for sentence in paragraph
-            for (token, tag) in sentence
-            if not self.is_punct(token) and not self.is_stopword(token) \
-                and not self.is_one_character(token)
-        ]
+        normalized_list = []
+        temp_result = None
+        for paragraph in document:
+            for sentence in paragraph:
+                for (token, tag) in sentence:
+                    if not self.is_punct(token) and not self.is_stopword(token) \
+                        and not self.is_one_character(token):
+                            temp_result = self.lemmatize(token, tag).lower()
+                            if len(temp_result) > 1:
+                                normalized_list.append(temp_result)
+        return normalized_list
     
     def fit(self, X, y=None):
         return self
@@ -133,9 +136,6 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
             
     def save(self):
         self.id2word.save(self.path)
-    
-    # def get_feature_names(self):
-    #     return list(self.id2word.values())
         
     def fit(self, documents):
         """
@@ -182,9 +182,10 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
 class NgramVectorizer(BaseEstimator, TransformerMixin):
     """Create ngram phrases from corpus.
     """
-    def __init__(self, min_count=NO_BELOW, threshold=10):
+    def __init__(self, min_count=NO_BELOW, threshold=10, bi_trigram="b"):
         self.min_count = min_count
         self.threshold = threshold
+        self.bi_trigram = bi_trigram
         self.documents = None
         if LANGUAGE == "english":
             self.connector_words = ENGLISH_CONNECTOR_WORDS
@@ -199,14 +200,27 @@ class NgramVectorizer(BaseEstimator, TransformerMixin):
             self.documents = list(documents)
         else:
             self.documents = documents
-        single_and_multiword_phrases = Phrases(self.documents, min_count=20, \
+        bigram = Phrases(self.documents, min_count=20, \
             threshold=THRESHOLD_NGRAM)
-        for idx in range(len(self.documents)):
-            for token in single_and_multiword_phrases[self.documents[idx]]:
-                if '_' in token:
-                    # Token is a bigram, add to document.
-                    self.documents[idx].append(token)
-            yield self.documents[idx]
+        if self.bi_trigram == "b":
+            # For Bigram:
+            for idx in range(len(self.documents)):
+                for token in bigram[self.documents[idx]]:
+                    if '_' in token:
+                        # Token is a bigram+trigram, add to document.
+                        self.documents[idx].append(token)
+                yield self.documents[idx]
+                
+        elif self.bi_trigram == "t":
+            # For Trigram:
+            trigram = Phrases(bigram[self.documents], min_count=20, \
+                threshold=THRESHOLD_NGRAM)
+            for idx in range(len(self.documents)):
+                for token in trigram[bigram[self.documents[idx]]]:
+                    if '_' in token:
+                        # Token is a bigram+trigram, add to document.
+                        self.documents[idx].append(token)
+                yield self.documents[idx]
     
 class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
     """Vectorizing each document when self.transform is executed.
