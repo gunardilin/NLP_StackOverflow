@@ -16,8 +16,10 @@ import types
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 NO_BELOW = 20
+LANGUAGE = "english"
+THRESHOLD_NGRAM = 5
 
-def tokenize(text:str, language:str="english")-> Generator[str]:
+def tokenize(text:str, language:str=LANGUAGE)-> Generator[str]:
     """Remove affixes, e.g. plurality, -"ing", -"tion", etc.
 
     Args:
@@ -38,7 +40,7 @@ def tokenize(text:str, language:str="english")-> Generator[str]:
 class TextNormalizer(BaseEstimator, TransformerMixin):
     """This class performs lemmatization."""
     
-    def __init__(self, language='english'):
+    def __init__(self, language=LANGUAGE):
         self.stopwords = set(nltk.corpus.stopwords.words(language))
         self.lemmatizer = WordNetLemmatizer()
         
@@ -178,10 +180,33 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
             yield sparse2full(docvec, len(self.id2word))
 
 class NgramVectorizer(BaseEstimator, TransformerMixin):
-    def __init__(self, min_count):
-        # min_count=1, threshold=1, connector_words=
+    """Create ngram phrases from corpus.
+    """
+    def __init__(self, min_count=NO_BELOW, threshold=10):
         self.min_count = min_count
-        return
+        self.threshold = threshold
+        self.documents = None
+        if LANGUAGE == "english":
+            self.connector_words = ENGLISH_CONNECTOR_WORDS
+        else:
+            raise Exception("Not compatible with non english language.")
+    
+    def fit(self, documents):
+        return self
+    
+    def transform(self, documents):
+        if isinstance(documents, types.GeneratorType):
+            self.documents = list(documents)
+        else:
+            self.documents = documents
+        single_and_multiword_phrases = Phrases(self.documents, min_count=20, \
+            threshold=THRESHOLD_NGRAM)
+        for idx in range(len(self.documents)):
+            for token in single_and_multiword_phrases[self.documents[idx]]:
+                if '_' in token:
+                    # Token is a bigram, add to document.
+                    self.documents[idx].append(token)
+            yield self.documents[idx]
     
 class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
     """Vectorizing each document when self.transform is executed.
