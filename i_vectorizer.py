@@ -81,7 +81,8 @@ class TextNormalizer(BaseEstimator, TransformerMixin):
             for paragraph in document
             for sentence in paragraph
             for (token, tag) in sentence
-            if not self.is_punct(token) and not self.is_stopword(token)
+            if not self.is_punct(token) and not self.is_stopword(token) \
+                and not self.is_one_character(token)
         ]
     
     def fit(self, X, y=None):

@@ -4,7 +4,7 @@ from i_vectorizer import TextNormalizer, GensimVectorizer, GensimVectorizer_Topi
 from sklearn.decomposition import LatentDirichletAllocation, TruncatedSVD, NMF
 
 from gensim.models import LsiModel, LdaModel#, EnsembleLda
-from o_debug import EnsembleLda
+from o_ensemble_lda_foundation import EnsembleLda
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
 from gensim.corpora.dictionary import Dictionary
@@ -154,6 +154,8 @@ class GensimTopicModels(object):
         vectorizer.documents = None     # Free up memory
         self.estimator.id2word = vectorizer.id2word.id2token
         self.estimator.partial_fit(self.doc_matrix)
+        self.save_doc_matrix_to_pickle(self.doc_matrix)
+        self.doc_matrix = None
         self.save_model()
         return self.model
     
@@ -337,26 +339,10 @@ if __name__ == "__main__":
     
     
     ## With Gensim for single year
-    # start_time = time.time()
-    # model = GensimTopicModels(n_topics=50, estimator="LDA")
-    # model.fit(2022)
-    # # print(model.estimator.gensim_model.print_topics(10))
-    # topics = model.get_topics()
-    # n = 0
-    # for topic in topics.values():
-    #     n += 1
-    #     print("Topic #{}:".format(n))
-    #     print(topic)
-    # model.visualize_topics()
-    # timer(start_time, time.time())
-    
-
-    ## With Gensim for multi years
     start_time = time.time()
-    model = GensimTopicModels(n_topics=50, estimator="ensembleLDA")
-    model.fit_multi_years(start_year=2022, end_year=2022)
+    model = GensimTopicModels(n_topics=50, estimator="LDA")
+    model.fit(2022)
     # print(model.estimator.gensim_model.print_topics(10))
-    model.optimize_ensembleLda()
     topics = model.get_topics()
     n = 0
     for topic in topics.values():
@@ -364,5 +350,21 @@ if __name__ == "__main__":
         print("Topic #{}:".format(n))
         print(topic)
     model.visualize_topics()
-    model.parse_logfile()
     timer(start_time, time.time())
+    
+
+    ## With Gensim for multi years
+    # start_time = time.time()
+    # model = GensimTopicModels(n_topics=50, estimator="ensembleLDA")
+    # model.fit_multi_years(start_year=2022, end_year=2022)
+    # # print(model.estimator.gensim_model.print_topics(10))
+    # model.optimize_ensembleLda()
+    # topics = model.get_topics()
+    # n = 0
+    # for topic in topics.values():
+    #     n += 1
+    #     print("Topic #{}:".format(n))
+    #     print(topic)
+    # model.visualize_topics()
+    # model.parse_logfile()
+    # timer(start_time, time.time())
