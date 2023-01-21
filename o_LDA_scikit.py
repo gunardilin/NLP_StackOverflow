@@ -118,7 +118,7 @@ class GensimTopicModels(object):
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         elif estimator == 'LDA':
             self.estimator = LdaTransformer(num_topics=self.n_topics, \
-                eval_every=10, passes=10, iterations=5000)
+                eval_every=None, passes=10, iterations=5000)
         elif estimator == 'ensembleLDA':
             self.estimator = "ensembleLDA"
         # self.load_model()
@@ -188,7 +188,7 @@ class GensimTopicModels(object):
             passes=50
             iterations=5000
             epsilon = 1
-            eval_every=10
+            eval_every=None
             
             self.estimator = EnsembleLda(
                 corpus=corpus,
@@ -249,25 +249,6 @@ class GensimTopicModels(object):
             tokens = [names[i] for i in features]
             topics[idx] = tokens
         return topics
-    
-    # def visualize_topics(self):
-    #     if self.estimator_str != "LDA":
-    #         print("** The pyLDAvis is only compatible for LDA not the currently used model.")
-    #         return
-    #     lda_model = self.estimator.gensim_model
-    #     temp_list = self.load_from_pickle(self.doc_matrix_pickle_path)
-        
-    #     corpus = []
-    #     for i in temp_list:
-    #         corpus += i
-    #     del temp_list   # Free up memory
-    #     lexicon = Dictionary()
-    #     lexicon.token2id = self.estimator.id2word
-    #     with warnings.catch_warnings():
-    #         warnings.simplefilter('ignore')
-    #         data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
-    #         pyLDAvis.save_html(data, 'other/lda.html')
-    #     return data
     
     def visualize_topics(self):
         if self.estimator_str != "LDA":

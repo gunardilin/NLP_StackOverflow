@@ -6,6 +6,7 @@ import os
 import gensim
 from gensim.corpora import Dictionary
 from gensim.matutils import sparse2full
+from gensim.models.phrases import Phrases, ENGLISH_CONNECTOR_WORDS
 import unicodedata
 from nltk.corpus import wordnet as wn
 from nltk.stem.wordnet import WordNetLemmatizer
@@ -13,6 +14,8 @@ import numpy as np
 import types
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+NO_BELOW = 20
 
 def tokenize(text:str, language:str="english")-> Generator[str]:
     """Remove affixes, e.g. plurality, -"ing", -"tion", etc.
@@ -109,7 +112,7 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
     By initializing self.binary=True, One Hot Encoding will be used.
     If self.binary=False, Frequency Vectorization is active. 
     """
-    def __init__(self, path:str=None, binary=False, tfidf=False):
+    def __init__(self, path:str=None, binary=False, tfidf=False, no_below=NO_BELOW):
         "path: save location for Dictionary after performing self.fit(...)"
         "Change binary to True to activate One Hot Encoding."
         self.path = path
@@ -120,6 +123,7 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         self.tfidf_model = None
         self.documents = None
         self.model = None
+        self.no_below = no_below
         
     def load(self):
         if os.path.exists(self.path):
@@ -143,7 +147,7 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
         else:
             self.documents = documents
         self.id2word = Dictionary(self.documents)
-        self.id2word.filter_extremes(no_below=20)
+        self.id2word.filter_extremes(no_below=self.no_below)
         self.save()
         return self
     
@@ -173,6 +177,12 @@ class GensimVectorizer(BaseEstimator, TransformerMixin):
 
             yield sparse2full(docvec, len(self.id2word))
 
+class NgramVectorizer(BaseEstimator, TransformerMixin):
+    def __init__(self, min_count):
+        # min_count=1, threshold=1, connector_words=
+        self.min_count = min_count
+        return
+    
 class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
     """Vectorizing each document when self.transform is executed.
     Reason for using Gensim: Gensim Dictionary can be saved to disk.
@@ -186,7 +196,7 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
     By initializing self.binary=True, One Hot Encoding will be used.
     If self.binary=False, Frequency Vectorization is active. 
     """
-    def __init__(self, path:str=None, binary=False, tfidf=False):
+    def __init__(self, path:str=None, binary=False, tfidf=False, no_below=NO_BELOW):
         "path: save location for Dictionary after performing self.fit(...)"
         "Change binary to True to activate One Hot Encoding."
         self.path = path
@@ -197,6 +207,7 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
         self.tfidf_model = None
         self.documents = None
         self.model = None
+        self.no_below = no_below
         
     def load(self):
         if os.path.exists(self.path):
@@ -223,7 +234,7 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
             self.id2word = Dictionary(self.documents)
         else:
             self.id2word.add_documents(self.documents)
-        self.id2word.filter_extremes(no_below=20)
+        self.id2word.filter_extremes(no_below=self.no_below)
         self.save()
         return self
     
