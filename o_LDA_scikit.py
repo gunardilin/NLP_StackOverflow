@@ -24,6 +24,9 @@ import sys
 import pickle
 import itertools
 
+import webbrowser
+import platform
+
 import logging
 # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
@@ -32,6 +35,8 @@ gensim_logfile_path = 'other/temp/gensim_logs.log'
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
                    level=logging.DEBUG,
                    filename=gensim_logfile_path)
+if os.path.exists(gensim_logfile_path):
+    os.remove(gensim_logfile_path)
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -253,6 +258,7 @@ class GensimTopicModels(object):
         return topics
     
     def visualize_topics(self):
+        html_path = 'other/lda.html'
         if self.estimator_str != "LDA":
             print("** The pyLDAvis is only compatible for LDA not the currently used model.")
             return
@@ -267,8 +273,16 @@ class GensimTopicModels(object):
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
-            pyLDAvis.save_html(data, 'other/lda.html')
-        return data
+            pyLDAvis.save_html(data, html_path)
+        
+        if platform.system().lower() == "darwin":  # check if on Mac OSX
+            webbrowser.get('macosx')
+            file_prefix = "file:///"
+        else:   # all other non Mac
+            file_prefix = ""
+            
+        webbrowser.open(file_prefix+os.path.abspath(html_path),new=2)
+        return
     
     def optimize_ensembleLda(self, new_epsilon="max"):
         if self.estimator_str != "ensembleLDA":
@@ -341,8 +355,8 @@ if __name__ == "__main__":
 
     ## With Gensim for multi years
     start_time = time.time()
-    model = GensimTopicModels(n_topics=50, estimator="LDA")
-    model.fit_multi_years(start_year=2022, end_year=2022)
+    model = GensimTopicModels(n_topics=15, estimator="LDA")
+    model.fit_multi_years(start_year=2012, end_year=2021)
     # print(model.estimator.gensim_model.print_topics(10))
     model.optimize_ensembleLda()
     topics = model.get_topics()
