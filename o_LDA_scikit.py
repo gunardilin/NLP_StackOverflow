@@ -10,6 +10,7 @@ from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
 from gensim.corpora.dictionary import Dictionary
 from gensim import corpora
+from gensim.models.coherencemodel import CoherenceModel
 
 import time
 from l_pipeline import timer
@@ -104,7 +105,7 @@ class SklearnTopicModels(object):
         return
 
 class GensimTopicModels(object):
-    def __init__(self, n_topics=10, estimator="LDA", \
+    def __init__(self, n_topics=20, estimator="LDA", \
         db_path:str="DB/StackOverflow.sqlite", \
         gensim_lexicon:str="other/model/lexicon.pkl"):
         self.lexicon_path = gensim_lexicon
@@ -174,7 +175,7 @@ class GensimTopicModels(object):
         print("Variable size: {}".format(sys.getsizeof(self.docs)))
         del docs                        # Free up memory
         self.doc_matrix = self.model.fit_transform(self.docs)
-        self.docs = None                # Free up memory
+        # self.docs = None                # Free up memory
         vectorizer = self.model.named_steps['vect']
         vectorizer.documents = None     # Free up memory
         if self.estimator != "ensembleLDA":
@@ -313,13 +314,45 @@ class GensimTopicModels(object):
         perplexity = [float(t[1]) for t in tuples]
         liklihood = [float(t[0]) for t in tuples]
         iter = list(range(0,len(tuples)*10,10))
-        plt.plot(iter,liklihood,c="black")
+        plt.plot(iter,perplexity,c="black")
         plt.ylabel("log liklihood")
         plt.xlabel("iteration")
         plt.title("Topic Model Convergence")
         plt.grid()
         plt.savefig("other/convergence_likelihood.pdf")
         plt.close()
+        return
+    
+    def find_optimal_lda_num_topics(self, min=5, max=20, step=1, start_year=2022, end_year=2022):
+        # refer to: 
+        # https://rare-technologies.com/what-is-topic-coherence/
+        # https://nbviewer.org/github/devashishd12/gensim/blob/280375fe14adea67ce6384ba7eabf362b05e6029/docs/notebooks/topic_coherence_tutorial.ipynb#topic=1&lambda=1&term=
+        coherence_values = []
+        model_list = []
+        for num_topics in range(min, max, step):
+            print("*** Evaluating num_topics: {}".format(num_topics))
+            
+            # Start: Initialize lda model
+            self.n_topics = num_topics
+            self.docs = []
+            self.doc_matrix = None
+            self.id2word = None
+            self.remove_temp([self.doc_matrix_pickle_path, self.lexicon_path])
+            # End: Initialize lda model
+            
+            model.fit_multi_years(start_year=2022, end_year=2022)
+            model_list.append(model)
+            coherencemodel = CoherenceModel(model=model, texts=self.docs, dictionary=self.doc_matrix, coherence='c_v')
+            coherence_values.append(coherencemodel.get_coherence())
+        
+        # show graph
+        import matplotlib.pyplot as plt
+        x = range(min, max, step)
+        plt.plot(x, coherence_values)
+        plt.xlabel("Num Topics")
+        plt.ylabel("Coherence score")
+        plt.legend(("coherence_values"), loc='best')
+        plt.show()
         return
         
         
@@ -354,6 +387,22 @@ if __name__ == "__main__":
     
 
     ## With Gensim for multi years
+    # start_time = time.time()
+    # model = GensimTopicModels(n_topics=10, estimator="LDA")
+    # model.fit_multi_years(start_year=2022, end_year=2022)
+    # # print(model.estimator.gensim_model.print_topics(10))
+    # # model.optimize_ensembleLda()
+    # topics = model.get_topics()
+    # n = 0
+    # for topic in topics.values():
+    #     n += 1
+    #     print("Topic #{}:".format(n))
+    #     print(topic)
+    # model.visualize_topics()
+    # model.parse_logfile()
+    # timer(start_time, time.time())
+    
+    ## Check optimal num topics
     start_time = time.time()
     model = GensimTopicModels(n_topics=15, estimator="LDA")
     model.fit_multi_years(start_year=2012, end_year=2021)
