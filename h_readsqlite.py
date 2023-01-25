@@ -42,7 +42,7 @@ class SqliteCorpusReader(SqliteOperation):
             id_list.pop(i)
         return id_list
     
-    def docs(self, timestamp:str=None):
+    def docs(self, timestamp:str=None, limit:str=None):
         """
         Returns the document loaded from Sqlite for every row.
         This uses a generator to acheive memory safe iteration.
@@ -57,6 +57,11 @@ class SqliteCorpusReader(SqliteOperation):
         )
         """
         base = base.format(timestamp)
+        if limit != None:
+            limit_str = """
+            LIMIT {}
+            """.format(limit)
+            base = base + limit_str
         self.execute_query(base)
         self.error_counter = 0
         n = 0

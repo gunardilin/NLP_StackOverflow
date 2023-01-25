@@ -107,7 +107,10 @@ class SklearnTopicModels(object):
 class GensimTopicModels(object):
     def __init__(self, n_topics=20, estimator="LDA", \
         db_path:str="DB/StackOverflow.sqlite", \
-        gensim_lexicon:str="other/model/lexicon.pkl"):
+        gensim_lexicon:str="other/model/lexicon.pkl",
+        eval_every=None,    # Change to 1 when finding optimal passes and itterations parameters
+        random_state=None,
+        memory_friendly=True): # memory_friendly false necessary for find_optimal_lda_num_topics
         self.lexicon_path = gensim_lexicon
         self.estimator_str = estimator
         self.corpus_reader = SqliteCorpusReader(path=db_path)     
@@ -119,13 +122,15 @@ class GensimTopicModels(object):
         self.model_filepath = "{}/{}_model".format(self.model_folderpath, estimator)
         self.tempFolderPath = "other/temp"
         self.doc_matrix_pickle_path = "{}/temp.pickle".format(self.tempFolderPath)
+        self.memory_friendly = memory_friendly
         self.remove_temp([self.doc_matrix_pickle_path, gensim_lexicon])
 
         if estimator == 'LSA':
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         elif estimator == 'LDA':
             self.estimator = LdaTransformer(num_topics=self.n_topics, \
-                eval_every=1, passes=20, iterations=400)
+                eval_every=eval_every, passes=20, iterations=400, \
+                random_state=random_state)
         elif estimator == 'ensembleLDA':
             self.estimator = "ensembleLDA"
         # self.load_model()
@@ -167,17 +172,18 @@ class GensimTopicModels(object):
         self.save_model()
         return self.model
     
-    def fit_multi_years(self, start_year:int, end_year:int):
+    def fit_multi_years(self, start_year:int, end_year:int, limit:None):
         for year in range(start_year, end_year+1):
             print("Reading corpus from Y{}".format(year))
-            docs = self.corpus_reader.docs(year)
+            docs = self.corpus_reader.docs(year, limit)
             self.docs += list(docs)      
         print("Variable size: {}".format(sys.getsizeof(self.docs)))
         del docs                        # Free up memory
         self.doc_matrix = self.model.fit_transform(self.docs)
-        # self.docs = None                # Free up memory
         vectorizer = self.model.named_steps['vect']
-        vectorizer.documents = None     # Free up memory
+        if self.memory_friendly:
+            self.docs = None                # Free up memory
+            vectorizer.documents = None     # Free up memory
         if self.estimator != "ensembleLDA":
             self.estimator.id2word = vectorizer.id2word.id2token
             self.estimator.partial_fit(self.doc_matrix)
@@ -323,37 +329,39 @@ class GensimTopicModels(object):
         plt.close()
         return
     
-    def find_optimal_lda_num_topics(self, min=5, max=20, step=1, start_year=2022, end_year=2022):
-        # refer to: 
-        # https://rare-technologies.com/what-is-topic-coherence/
-        # https://nbviewer.org/github/devashishd12/gensim/blob/280375fe14adea67ce6384ba7eabf362b05e6029/docs/notebooks/topic_coherence_tutorial.ipynb#topic=1&lambda=1&term=
-        coherence_values = []
-        model_list = []
-        for num_topics in range(min, max, step):
-            print("*** Evaluating num_topics: {}".format(num_topics))
-            
-            # Start: Initialize lda model
-            self.n_topics = num_topics
-            self.docs = []
-            self.doc_matrix = None
-            self.id2word = None
-            self.remove_temp([self.doc_matrix_pickle_path, self.lexicon_path])
-            # End: Initialize lda model
-            
-            model.fit_multi_years(start_year=2022, end_year=2022)
-            model_list.append(model)
-            coherencemodel = CoherenceModel(model=model, texts=self.docs, dictionary=self.doc_matrix, coherence='c_v')
-            coherence_values.append(coherencemodel.get_coherence())
+def find_optimal_lda_num_topics(min=5, max=20, step=1, start_year=2022, end_year=2022, \
+    lexicon_path="other/model/lexicon.pkl"):
+    # refer to: 
+    # https://rare-technologies.com/what-is-topic-coherence/
+    # https://nbviewer.org/github/devashishd12/gensim/blob/280375fe14adea67ce6384ba7eabf362b05e6029/docs/notebooks/topic_coherence_tutorial.ipynb#topic=1&lambda=1&term=
+    
+    lexicon = Dictionary.load(lexicon_path)
+    for key, value in lexicon.token2id.items():
+        lexicon.id2token[value] = key
+    coherence_values = []
+    for num_topics in range(min, max, step):
+        print("*** Evaluating num_topics: {}".format(num_topics))
+
+        model = GensimTopicModels(n_topics=num_topics, estimator="LDA", \
+            random_state=100, memory_friendly=False)
+        model.fit_multi_years(start_year=start_year, end_year=end_year, limit=None)
         
-        # show graph
-        import matplotlib.pyplot as plt
-        x = range(min, max, step)
-        plt.plot(x, coherence_values)
-        plt.xlabel("Num Topics")
-        plt.ylabel("Coherence score")
-        plt.legend(("coherence_values"), loc='best')
-        plt.show()
-        return
+        vectorizer = model.model.named_steps['vect']
+
+        coherencemodel = CoherenceModel(model=model.estimator.gensim_model, texts=vectorizer.documents, dictionary=lexicon, coherence='c_v')
+        coherence_score = coherencemodel.get_coherence()
+        print("->-> Coherence_score for {} topics: {}".format(num_topics, coherence_score))
+        coherence_values.append(coherence_score)
+    
+    # show graph
+    import matplotlib.pyplot as plt
+    x = range(min, max, step)
+    plt.plot(x, coherence_values)
+    plt.xlabel("Num Topics")
+    plt.ylabel("Coherence score")
+    plt.legend(("coherence_values"), loc='best')
+    plt.show()
+    return
         
         
 
@@ -402,18 +410,8 @@ if __name__ == "__main__":
     # model.parse_logfile()
     # timer(start_time, time.time())
     
+    
     ## Check optimal num topics
     start_time = time.time()
-    model = GensimTopicModels(n_topics=15, estimator="LDA")
-    model.fit_multi_years(start_year=2012, end_year=2021)
-    # print(model.estimator.gensim_model.print_topics(10))
-    model.optimize_ensembleLda()
-    topics = model.get_topics()
-    n = 0
-    for topic in topics.values():
-        n += 1
-        print("Topic #{}:".format(n))
-        print(topic)
-    model.visualize_topics()
-    # model.parse_logfile()
+    find_optimal_lda_num_topics(5,10, 1, 2022, 2022)
     timer(start_time, time.time())
