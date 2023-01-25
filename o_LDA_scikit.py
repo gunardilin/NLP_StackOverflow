@@ -32,11 +32,11 @@ import logging
 
 # Logging for debug purpose:
 gensim_logfile_path = 'other/temp/gensim_logs.log'
+if os.path.exists(gensim_logfile_path):
+    os.remove(gensim_logfile_path)
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
                    level=logging.DEBUG,
                    filename=gensim_logfile_path)
-if os.path.exists(gensim_logfile_path):
-    os.remove(gensim_logfile_path)
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -124,7 +124,7 @@ class GensimTopicModels(object):
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         elif estimator == 'LDA':
             self.estimator = LdaTransformer(num_topics=self.n_topics, \
-                eval_every=None, passes=20, iterations=400)
+                eval_every=1, passes=20, iterations=400)
         elif estimator == 'ensembleLDA':
             self.estimator = "ensembleLDA"
         # self.load_model()
