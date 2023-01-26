@@ -329,8 +329,8 @@ class GensimTopicModels(object):
         plt.close()
         return
     
-def find_optimal_lda_num_topics(min=5, max=20, step=1, start_year=2022, end_year=2022, \
-    lexicon_path="other/model/lexicon.pkl"):
+def find_optimal_lda_num_topics(min=5, max=20, step=1, start_year=2012, end_year=2021, \
+    lexicon_path="other/model/lexicon.pkl", limit=None):
     # refer to: 
     # https://rare-technologies.com/what-is-topic-coherence/
     # https://nbviewer.org/github/devashishd12/gensim/blob/280375fe14adea67ce6384ba7eabf362b05e6029/docs/notebooks/topic_coherence_tutorial.ipynb#topic=1&lambda=1&term=
@@ -344,7 +344,7 @@ def find_optimal_lda_num_topics(min=5, max=20, step=1, start_year=2022, end_year
 
         model = GensimTopicModels(n_topics=num_topics, estimator="LDA", \
             random_state=100, memory_friendly=False)
-        model.fit_multi_years(start_year=start_year, end_year=end_year, limit=None)
+        model.fit_multi_years(start_year=start_year, end_year=end_year, limit=limit)
         
         vectorizer = model.model.named_steps['vect']
 
