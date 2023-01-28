@@ -3,14 +3,23 @@ from b_sqlite_operation import SqliteOperation
 import time
 
 PATH_GOOGLE_CREDENTIAL = "../Credentials/service-account-file.json"
+# QUERY = """
+#     SELECT *
+#     FROM `projectstackoverflow.Query_StackOverflow.03_Post_Questions_with_full_family_keywords`
+#     ORDER BY creation_date DESC
+# """
+# NAME_TABLE = "raw_datas"
+
 QUERY = """
     SELECT *
-    FROM `projectstackoverflow.Query_StackOverflow.03_Post_Questions_with_full_family_keywords`
+    FROM `projectstackoverflow.Query_StackOverflow.04_Relevant_Post_Answers`
     ORDER BY creation_date DESC
 """
-PATH_SQLITE = "./DB/StackOverflow.sqlite"
-NAME_TABLE = "raw_datas"
+NAME_TABLE = "raw_answer_datas"
 
+# 04_Relevant_Post_Answers
+
+PATH_SQLITE = "./DB/StackOverflow.sqlite"
 bigquery_handler = BigqueryOperation(PATH_GOOGLE_CREDENTIAL)
 df_iterable = bigquery_handler.query_request(QUERY)
 df_schema = bigquery_handler.last_request_schema
