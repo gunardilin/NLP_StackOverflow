@@ -32,12 +32,12 @@ import logging
 # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 # Logging for debug purpose:
-gensim_logfile_path = 'other/temp/gensim_logs.log'
-if os.path.exists(gensim_logfile_path):
-    os.remove(gensim_logfile_path)
-logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
-                   level=logging.DEBUG,
-                   filename=gensim_logfile_path)
+# gensim_logfile_path = 'other/temp/gensim_logs.log'
+# if os.path.exists(gensim_logfile_path):
+#     os.remove(gensim_logfile_path)
+# logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
+#                    level=logging.DEBUG,
+#                    filename=gensim_logfile_path)
 
 class SklearnEstimator(object):
     def __init__(self, n_topics=50, estimator="LDA"):
@@ -419,6 +419,52 @@ def find_optimal_lda_num_topics(min=5, max=15, step=1, start_year=2022, end_year
     plt.show()
     
     return
+
+def find_optimal_lda_num_topics_slow(min=5, max=15, step=1, start_year=2022, end_year=2022, \
+    lexicon_path="other/model/lexicon.pkl", limit=None, random_state=100):
+    # For some reason the function "find_optimal_lda_num_topics" stops without 
+    # any error message. If limit argument is given, the function works well.
+    # My guess: it is due to not enough memory capacity (8GB) on MacBook Air M2.
+       
+    def read_lexicon(path):
+        lexicon = Dictionary.load(path)
+        for key, value in lexicon.token2id.items():
+            lexicon.id2token[value] = key
+        return lexicon
+    
+    lexicon = None    
+    coherence_values = []
+    for num_topics in range(min, max+1, step):
+        print("*** Evaluating num_topics: {}".format(num_topics))
+
+        model = GensimTopicModels(n_topics=num_topics, estimator="LDA", \
+            random_state=random_state, memory_friendly=True)
+        model.fit_multi_years(start_year=start_year, end_year=end_year, \
+            limit=limit)
+        
+        vectorizer = model.model.named_steps['vect']
+        
+        # Get lexicon:
+        if lexicon == None:
+            lexicon = read_lexicon(lexicon_path)
+        
+        coherencemodel = CoherenceModel(model=model.estimator.gensim_model, texts=vectorizer.documents, dictionary=lexicon, coherence='c_v')
+        coherence_score = coherencemodel.get_coherence()
+        print("->-> Coherence_score for {} topics: {}".format(num_topics, coherence_score))
+        coherence_values.append(coherence_score)
+        model.visualize_topics(False)
+    
+    # show graph
+    import matplotlib.pyplot as plt
+    x = range(min, max+1, step)
+    plt.plot(x, coherence_values)
+    plt.xlabel("Num Topics")
+    plt.ylabel("Coherence score")
+    plt.legend(("coherence_values"), loc='best')
+    plt.savefig("other/convergencegraph_{}-{}.pdf".format(start_year, end_year))
+    plt.show()
+    
+    return
         
         
 
@@ -454,7 +500,7 @@ if __name__ == "__main__":
     ## With Gensim for multi years
     # start_time = time.time()
     # model = GensimTopicModels(n_topics=10, estimator="LDA")
-    # model.fit_multi_years(start_year=2022, end_year=2022, limit=500)
+    # model.fit_multi_years(start_year=2012, end_year=2021 )
     # print(model.estimator.gensim_model.print_topics(10))
     # # # model.optimize_ensembleLda()
     # topics = model.get_topics()
@@ -470,5 +516,5 @@ if __name__ == "__main__":
     
     ## Check optimal num topics
     start_time = time.time()
-    find_optimal_lda_num_topics(5,25, 1, 2012, 2021)
+    find_optimal_lda_num_topics_slow(5,8, 1, 2018, 2021, limit=50)
     timer(start_time, time.time())
