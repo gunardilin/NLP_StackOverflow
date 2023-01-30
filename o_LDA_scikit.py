@@ -360,24 +360,24 @@ class GensimTopicModels(object):
         self.estimator.recluster(eps=new_epsilon, min_samples=2, min_cores=2)
         return 
     
-    def parse_logfile(self):
-        import re
-        import matplotlib.pyplot as plt
-        p = re.compile("(-*\d+\.\d+) per-word .* (\d+\.\d+) perplexity")
-        matches = [p.findall(l) for l in open(gensim_logfile_path)]
-        matches = [m for m in matches if len(m) > 0]
-        tuples = [t[0] for t in matches]
-        perplexity = [float(t[1]) for t in tuples]
-        liklihood = [float(t[0]) for t in tuples]
-        iter = list(range(0,len(tuples)*10,10))
-        plt.plot(iter,perplexity,c="black")
-        plt.ylabel("log liklihood")
-        plt.xlabel("iteration")
-        plt.title("Topic Model Convergence")
-        plt.grid()
-        plt.savefig("other/convergence_likelihood.pdf")
-        plt.close()
-        return
+    # def parse_logfile(self):
+    #     import re
+    #     import matplotlib.pyplot as plt
+    #     p = re.compile("(-*\d+\.\d+) per-word .* (\d+\.\d+) perplexity")
+    #     matches = [p.findall(l) for l in open(gensim_logfile_path)]
+    #     matches = [m for m in matches if len(m) > 0]
+    #     tuples = [t[0] for t in matches]
+    #     perplexity = [float(t[1]) for t in tuples]
+    #     liklihood = [float(t[0]) for t in tuples]
+    #     iter = list(range(0,len(tuples)*10,10))
+    #     plt.plot(iter,perplexity,c="black")
+    #     plt.ylabel("log liklihood")
+    #     plt.xlabel("iteration")
+    #     plt.title("Topic Model Convergence")
+    #     plt.grid()
+    #     plt.savefig("other/convergence_likelihood.pdf")
+    #     plt.close()
+    #     return
     
 def find_optimal_lda_num_topics(min=5, max=15, step=1, start_year=2022, end_year=2022, \
     limit=None, random_state=100):
@@ -511,23 +511,23 @@ if __name__ == "__main__":
     
 
     ## With Gensim for multi years
-    # start_time = time.time()
-    # model = GensimTopicModels(n_topics=10, estimator="LDA")
-    # model.fit_multi_years(start_year=2012, end_year=2021 )
-    # print(model.estimator.gensim_model.print_topics(10))
-    # # # model.optimize_ensembleLda()
-    # topics = model.get_topics()
-    # n = 0
-    # for topic in topics.values():
-    #     n += 1
-    #     print("Topic #{}:".format(n))
-    #     print(topic)
-    # model.visualize_topics()
-    # # model.parse_logfile()
-    # timer(start_time, time.time())
+    start_time = time.time()
+    model = GensimTopicModels(n_topics=7, estimator="LDA")
+    model.fit_multi_years(start_year=2012, end_year=2021)
+    print(model.estimator.gensim_model.print_topics(10))
+    # # model.optimize_ensembleLda()
+    topics = model.get_topics()
+    n = 0
+    for topic in topics.values():
+        n += 1
+        print("Topic #{}:".format(n))
+        print(topic)
+    model.visualize_topics()
+    # model.parse_logfile()
+    timer(start_time, time.time())
     
     
     ## Check optimal num topics
-    start_time = time.time()
-    find_optimal_lda_num_topics(5, 8, 1, 2018, 2021, limit=50)
-    timer(start_time, time.time())
+    # start_time = time.time()
+    # find_optimal_lda_num_topics(5, 8, 1, 2021, 2021, limit=100)
+    # timer(start_time, time.time())
