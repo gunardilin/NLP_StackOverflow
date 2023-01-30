@@ -8,6 +8,7 @@ from gensim.models import LsiModel, LdaModel#, EnsembleLda
 from o_ensemble_lda_foundation import EnsembleLda
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
+from o_ldamallet import LdaMallet
 from gensim.corpora.dictionary import Dictionary
 from gensim import corpora
 from gensim.models.coherencemodel import CoherenceModel
@@ -111,7 +112,8 @@ class GensimTopicModels(object):
         random_state=None,
         memory_friendly=True, # memory_friendly false necessary for find_optimal_lda_num_topics
         doc_matrix=None,    # Necessary for find_optimal_lda_num_topics
-        vectorizer=None):   # Necessary for find_optimal_lda_num_topics
+        vectorizer=None,    # Necessary for find_optimal_lda_num_topics
+        iterations=400):
         self.lexicon_path = None
         self.estimator_str = estimator
         self.corpus_reader = SqliteCorpusReader(path=db_path)     
@@ -126,6 +128,9 @@ class GensimTopicModels(object):
         self.model_folderpath = None#"other/model"
         self.model_filepath = None#"{}/{}_model".format(self.model_folderpath, estimator)
         self.tempFolderPath = "other/temp"
+        self.malletPath = None  # Necessary for LDA Mallet model
+        self.random_state = random_state
+        self.iterations = iterations
         self.doc_matrix_pickle_path = None
         self.memory_friendly = memory_friendly
 
@@ -133,8 +138,13 @@ class GensimTopicModels(object):
             self.estimator = LsiTransformer(num_topics=self.n_topics)
         elif estimator == 'LDA':
             self.estimator = LdaTransformer(num_topics=self.n_topics, \
-                eval_every=eval_every, passes=20, iterations=400, \
+                eval_every=eval_every, passes=20, iterations=self.iterations, \
                 random_state=random_state)
+        elif estimator == 'LDA_Mallet':
+            mallet_path = "/Users/gunardiali/mallet-2.0.8"
+            os.environ['MALLET_HOME'] = mallet_path
+            self.mallet_path = mallet_path + "/bin/mallet"
+            self.estimator = 'LDA_Mallet'
         elif estimator == 'ensembleLDA':
             self.estimator = "ensembleLDA"
         # self.load_model()
@@ -231,9 +241,20 @@ class GensimTopicModels(object):
             self.doc_matrix, self.vectorizer = doc_matrix, vectorizer
             print("Doc_matrix and vectorizer are supplied.")
 
-        if self.estimator != "ensembleLDA":
+        if self.estimator not in ["ensembleLDA", "LDA_Mallet"]:
             self.estimator.id2word = self.vectorizer.id2word.id2token
             self.estimator.partial_fit(self.doc_matrix)
+        elif self.estimator == "LDA_Mallet":
+            corpus = self.doc_matrix
+            dictionary = self.vectorizer.id2word.id2token
+            # tempMalletPath = "temp_mallet/abc"
+            # if not os.path.exists(tempMalletPath):
+            #     os.makedirs(tempMalletPath)
+            self.estimator = LdaMallet(self.mallet_path, corpus=corpus, \
+                num_topics=self.n_topics, id2word=dictionary,\
+                iterations=self.iterations, random_seed=self.random_state, \
+                alpha=50, workers=4, optimize_interval=0, topic_threshold=0.0, \
+                prefix=None)
         elif self.estimator == "ensembleLDA":
             
             # # Increase max recursion limit. Necessary for EnsembleLda.
@@ -512,8 +533,8 @@ if __name__ == "__main__":
 
     ## With Gensim for multi years
     start_time = time.time()
-    model = GensimTopicModels(n_topics=7, estimator="LDA")
-    model.fit_multi_years(start_year=2012, end_year=2021)
+    model = GensimTopicModels(n_topics=7, estimator="LDA_Mallet")
+    model.fit_multi_years(start_year=2018, end_year=2020, limit=100)
     print(model.estimator.gensim_model.print_topics(10))
     # # model.optimize_ensembleLda()
     topics = model.get_topics()
