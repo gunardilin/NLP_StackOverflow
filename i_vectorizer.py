@@ -253,6 +253,8 @@ class GensimVectorizer_Topic_Discovery(BaseEstimator, TransformerMixin):
             self.id2word = Dictionary.load(self.path)
             
     def save(self):
+        if not os.path.exists(os.path.dirname(self.path)):
+            os.makedirs(os.path.dirname(self.path))
         self.id2word.save(self.path)
     
     # def get_feature_names(self):
