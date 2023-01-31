@@ -8,7 +8,12 @@ from gensim.models import LsiModel, LdaModel#, EnsembleLda
 from o_ensemble_lda_foundation import EnsembleLda
 from o_ldamodel import LdaTransformer
 from o_lsimodel import LsiTransformer
-from o_ldamallet import LdaMallet
+from o_ldamallet import LdaMallet   
+# https://programminghistorian.org/en/lessons/topic-modeling-and-mallet#mac-instructions
+# https://rare-technologies.com/tutorial-on-mallet-in-python/
+# https://melaniewalsh.github.io/Intro-Cultural-Analytics/05-Text-Analysis/08-Topic-Modeling-Text-Files.html
+# https://www.machinelearningplus.com/nlp/topic-modeling-gensim-python/#15visualizethetopicskeywords
+
 from gensim.corpora.dictionary import Dictionary
 from gensim import corpora
 from gensim.models.coherencemodel import CoherenceModel
