@@ -32,7 +32,7 @@ import logging
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 # Logging for debug purpose:
-# gensim_logfile_path = 'other/temp/gensim_logs.log'
+gensim_logfile_path = 'other/temp/gensim_logs.log'
 # if os.path.exists(gensim_logfile_path):
 #     os.remove(gensim_logfile_path)
 # logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s',
@@ -202,9 +202,17 @@ class GensimTopicModels(object):
         self.start_year = start_year
         self.end_year = end_year
         
-        self.model_folderpath = "other/model_{}-{}".format(start_year, end_year)
-        self.model_filepath = "{}/{}_model_{}_topics".format(self.model_folderpath,\
-            self.estimator_str, self.n_topics)
+        self.model_folderpath = "other/model_{}-{}_collections".format(start_year, end_year)
+        n = 1
+        self.model_filepath = "{}/{}_model_{}_topics_{}".format(self.model_folderpath,\
+            self.estimator_str, self.n_topics, n)
+        while True:
+            if os.path.exists(self.model_filepath):
+                n += 1
+                self.model_filepath = "{}/{}_model_{}_topics_{}".format(self.model_folderpath,\
+                    self.estimator_str, self.n_topics, n)
+            else:
+                break
         
         self.doc_matrix_pickle_path = "{}/doc_matrix.pickle".format(self.model_folderpath)
         
@@ -313,8 +321,9 @@ class GensimTopicModels(object):
         return topics
     
     def visualize_topics(self, open_in_browser=True):
-        html_path = '{}/lda_{}-{}_{}_topics.html'.format(self.model_folderpath, \
-            self.start_year, self.end_year, self.n_topics)
+        # html_path = '{}/lda_{}-{}_{}_topics.html'.format(self.model_folderpath, \
+        #     self.start_year, self.end_year, self.n_topics)
+        html_path = "{}_Vis.html".format(self.model_filepath)
         if self.estimator_str != "LDA":
             print("** The pyLDAvis is only compatible for LDA not the currently used model.")
             return
@@ -328,7 +337,11 @@ class GensimTopicModels(object):
         lexicon = Dictionary.load(self.lexicon_path)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
+            try:
+                data = pyLDAvis.gensim_models.prepare(lda_model, corpus, lexicon)
+            except:
+                print("Something's wrong with Pyldavis source code.")
+                return
             pyLDAvis.save_html(data, html_path)
         
         if platform.system().lower() == "darwin":  # check if on Mac OSX
@@ -360,24 +373,24 @@ class GensimTopicModels(object):
         self.estimator.recluster(eps=new_epsilon, min_samples=2, min_cores=2)
         return 
     
-    # def parse_logfile(self):
-    #     import re
-    #     import matplotlib.pyplot as plt
-    #     p = re.compile("(-*\d+\.\d+) per-word .* (\d+\.\d+) perplexity")
-    #     matches = [p.findall(l) for l in open(gensim_logfile_path)]
-    #     matches = [m for m in matches if len(m) > 0]
-    #     tuples = [t[0] for t in matches]
-    #     perplexity = [float(t[1]) for t in tuples]
-    #     liklihood = [float(t[0]) for t in tuples]
-    #     iter = list(range(0,len(tuples)*10,10))
-    #     plt.plot(iter,perplexity,c="black")
-    #     plt.ylabel("log liklihood")
-    #     plt.xlabel("iteration")
-    #     plt.title("Topic Model Convergence")
-    #     plt.grid()
-    #     plt.savefig("other/convergence_likelihood.pdf")
-    #     plt.close()
-    #     return
+    def parse_logfile(self):
+        import re
+        import matplotlib.pyplot as plt
+        p = re.compile("(-*\d+\.\d+) per-word .* (\d+\.\d+) perplexity")
+        matches = [p.findall(l) for l in open(gensim_logfile_path)]
+        matches = [m for m in matches if len(m) > 0]
+        tuples = [t[0] for t in matches]
+        perplexity = [float(t[1]) for t in tuples]
+        liklihood = [float(t[0]) for t in tuples]
+        iter = list(range(0,len(tuples)*10,10))
+        plt.plot(iter,perplexity,c="black")
+        plt.ylabel("log liklihood")
+        plt.xlabel("iteration")
+        plt.title("Topic Model Convergence")
+        plt.grid()
+        plt.savefig("other/convergence_likelihood.pdf")
+        plt.close()
+        return
     
 def find_optimal_lda_num_topics(min=5, max=15, step=1, start_year=2022, end_year=2022, \
     limit=None, random_state=100):
@@ -511,23 +524,40 @@ if __name__ == "__main__":
     
 
     ## With Gensim for multi years
-    start_time = time.time()
-    model = GensimTopicModels(n_topics=7, estimator="LDA")
-    model.fit_multi_years(start_year=2012, end_year=2021)
-    print(model.estimator.gensim_model.print_topics(10))
-    # # model.optimize_ensembleLda()
-    topics = model.get_topics()
-    n = 0
-    for topic in topics.values():
-        n += 1
-        print("Topic #{}:".format(n))
-        print(topic)
-    model.visualize_topics()
-    # model.parse_logfile()
-    timer(start_time, time.time())
+    # start_time = time.time()
+    # model = GensimTopicModels(n_topics=7, estimator="LDA")
+    # model.fit_multi_years(start_year=2019, end_year=2021, limit=100)
+    # print(model.estimator.gensim_model.print_topics(10))
+    # # # model.optimize_ensembleLda()
+    # topics = model.get_topics()
+    # n = 0
+    # for topic in topics.values():
+    #     n += 1
+    #     print("Topic #{}:".format(n))
+    #     print(topic)
+    # model.visualize_topics()
+    # # model.parse_logfile()
+    # timer(start_time, time.time())
     
     
     ## Check optimal num topics
     # start_time = time.time()
     # find_optimal_lda_num_topics(5, 8, 1, 2021, 2021, limit=100)
     # timer(start_time, time.time())
+
+    ## Generate collections of LDA models:
+    start_time = time.time()
+    for i in range(10):
+        model = GensimTopicModels(n_topics=6, estimator="LDA")
+        model.fit_multi_years(start_year=2012, end_year=2021)
+        # print(model.estimator.gensim_model.print_topics(10))
+        # # model.optimize_ensembleLda()
+        # topics = model.get_topics()
+        # n = 0
+        # for topic in topics.values():
+        #     n += 1
+        #     print("Topic #{}:".format(n))
+        #     print(topic)
+        model.visualize_topics(open_in_browser=False)
+        # model.parse_logfile()
+        timer(start_time, time.time())

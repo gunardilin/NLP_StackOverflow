@@ -5,6 +5,8 @@ from b_sqlite_operation import SqliteOperation
 # from nltk.corpus.reader.api import CorpusReader, CategorizedCorpusReader
 
 import json
+import os
+import pickle
 
 # sqlite_handler = SQLiteHtmlJson_Connector()
 # iterable_row = sqlite_handler.read_from_db("preprocessed_datas", "preprocessed_html", \
@@ -64,7 +66,6 @@ class SqliteCorpusReader(SqliteOperation):
             base = base + limit_str
         self.execute_query(base)
         self.error_counter = 0
-        n = 0
         for i in self.last_cursor:
             try:
                 json_str = i[1].replace("['", '["').replace("', '", '", "').\
@@ -73,34 +74,7 @@ class SqliteCorpusReader(SqliteOperation):
                 yield json.loads(json_str)
             except:
                 self.error_counter += 1
-                self.faulty_index.append(n)
-            n += 1
-    
-    # def docs(self, timestamp:str=None):
-    #     """
-    #     Returns the document loaded from Sqlite for every row.
-    #     This uses a generator to acheive memory safe iteration.
-    #     """
-    #     base = """
-    #     SELECT preprocessed_html
-    #     FROM preprocessed_datas
-    #     WHERE id IN (
-    #     SELECT id
-    #     FROM raw_datas
-    #     WHERE creation_date LIKE "{}%"
-    #     )
-    #     """
-    #     base = base.format(timestamp)
-    #     self.execute_query(base)
-    #     self.error_counter = 0
-    #     for i in self.last_cursor:
-    #         try:
-    #             json_str = i[0].replace("['", '["').replace("', '", '", "').\
-    #                 replace("']", '"]').replace("""", \'""", '", "').\
-    #                 replace("\\", "").replace('"[""', '"["').replace('[""]"', '["]"')
-    #             yield json.loads(json_str)
-    #         except:
-    #             self.error_counter += 1
+                self.faulty_index.append(i[0])
 
     def paras(self, timestamp:str=None):
         """
@@ -127,14 +101,33 @@ class SqliteCorpusReader(SqliteOperation):
         for sentence in self.sents(timestamp):
             for token in sentence:
                 yield token
-                
 
-if __name__ == "__main__":
-    start_time = time.time()
-    PATH =  "DB/StackOverflow.sqlite"
-    corpus_reader = SqliteCorpusReader(path=PATH)
+def save_to_pickle(folder_path=None, file_name=None, content=None, file_path=None):
+    if file_path == None:
+        file_path = "{}/{}.pickle".format(folder_path, file_name)
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+    with open(file_path,"wb") as f:
+        pickle.dump(content, f)
+    print("Data are saved into pickle: {}.".format(file_path))
+    return
+
+def load_from_pickle(file_path):
+    with open(file_path, "rb") as r:
+        content = pickle.load(r)
+    print("Content from pickle: {}".format(content))
+    return content
+    
+
+def create_faulty_dict(DB_PATH, FOLDER_PATH, FILE_NAME, start_year=2008, \
+    end_year=2022):
+    # It is necessary to generate and save in pickle all faulty document ids.
+    # These ids will be used in p_analysis.py
+    
+    corpus_reader = SqliteCorpusReader(path=DB_PATH)
     counter = 0
-    for year in range(2022,2023):
+    faulty_index_dict = {}
+    for year in range(start_year, end_year+1):
         print("Start reading datas for year {}.".format(year))
         for i in corpus_reader.words(year):
             counter += 1
@@ -142,80 +135,70 @@ if __name__ == "__main__":
         print("List counter: {}".format(counter))
         print("Error counter: {}".format(str(corpus_reader.error_counter)))
         print("Percentage: {}%".format(round(corpus_reader.error_counter/counter, 4)))
+        print("Faulty index: {}".format(corpus_reader.faulty_index))
+        faulty_index_dict[year] = corpus_reader.faulty_index
+        corpus_reader.faulty_index = []
+        print("\n")
+    
+    save_to_pickle(FOLDER_PATH, FILE_NAME, faulty_index_dict)
+    load_from_pickle("{}/{}.pickle".format(FOLDER_PATH, FILE_NAME))
+
+def create_total_index(DB_PATH, FOLDER_PATH, FILE_NAME, start_year=2008, \
+    end_year=2022):
+    # This function will read all document ids, group it based on years and 
+    # save into pickle. These ids will be used in p_analysis.py
+    db_handle = SqliteOperation(DB_PATH)
+    base = """
+        SELECT id
+        FROM raw_datas
+        WHERE creation_date LIKE "{}%"
+        """
+    id_dictionary = {}
+    for year in range(start_year, end_year+1):
+        print("Processing datas for {}".format(year))
+        query = base.format(year)
+        db_handle.execute_query(query)
+        temp_list = list(db_handle.last_cursor)
+        temp_list2 = []
+        for i in temp_list:
+            temp_list2.append(i[0])
+        id_dictionary[year] = temp_list2
+    print("Saving to pickle")
+    save_to_pickle(FOLDER_PATH, FILE_NAME, id_dictionary)
+    print("\n")
+    load_from_pickle("{}/{}.pickle".format(FOLDER_PATH, FILE_NAME))
+    return
+
+def create_existing_data_index(total_path, faulty_path, save_path):
+    total_index = load_from_pickle(total_path)
+    faulty_index = load_from_pickle(faulty_path)
+    for year in list(faulty_index.keys()):
+        for i in faulty_index[year]:
+            total_index[year].remove(i)
+    save_to_pickle(file_path=save_path, content=total_index)
+    return
+
+if __name__ == "__main__":
+    
+    start_time = time.time()
+    # PATH =  "DB/StackOverflow.sqlite"
+    # FOLDER_PATH = "other/model_2012-2021_1/index"
+    # FILE_NAME = "faulty_data_index"
+    # create_faulty_dict(PATH, FOLDER_PATH, FILE_NAME)
+    
+    # FILE_NAME = "total_data_index"
+    # create_total_index(PATH, FOLDER_PATH, FILE_NAME)
+    
+    total_path = "other/model_2012-2021_1/index/total_data_index.pickle"
+    faulty_path = "other/model_2012-2021_1/index/faulty_data_index.pickle"
+    save_path = "other/model_2012-2021_1/index/existing_data_index.pickle"
+    # create_existing_data_index(total_path, faulty_path, save_path)
+    a = load_from_pickle(total_path)
+    b = load_from_pickle(faulty_path)
+    c = load_from_pickle(save_path)
+    
+    for i in list(a.keys()):
+        print("Year {}: {}".format(i, len(a[i])-len(b[i])==len(c[i])))
+        print(len(a[i]), len(b[i]), len(c[i]))
     end_time = time.time()
     print("Duration: {} seconds".format(round(end_time-start_time, 2)))
-        
-
-# class PickledCorpusReader(CategorizedCorpusReader, CorpusReader):
-
-#     def __init__(self, root, fileids=PKL_PATTERN, **kwargs):
-#         """
-#         Initialize the corpus reader.  Categorization arguments
-#         (``cat_pattern``, ``cat_map``, and ``cat_file``) are passed to
-#         the ``CategorizedCorpusReader`` constructor.  The remaining arguments
-#         are passed to the ``CorpusReader`` constructor.
-#         """
-#         # Add the default category pattern if not passed into the class.
-#         if not any(key.startswith('cat_') for key in kwargs.keys()):
-#             kwargs['cat_pattern'] = CAT_PATTERN
-
-#         CategorizedCorpusReader.__init__(self, kwargs)
-#         CorpusReader.__init__(self, root, fileids)
-
-#     def resolve(self, fileids, categories):
-#         """
-#         Returns a list of fileids or categories depending on what is passed
-#         to each internal corpus reader function. This primarily bubbles up to
-#         the high level ``docs`` method, but is implemented here similar to
-#         the nltk ``CategorizedPlaintextCorpusReader``.
-#         """
-#         if fileids is not None and categories is not None:
-#             raise ValueError("Specify fileids or categories, not both")
-
-#         if categories is not None:
-#             return self.fileids(categories)
-#         return fileids
-
-#     def docs(self, fileids=None, categories=None):
-#         """
-#         Returns the document loaded from a pickled object for every file in
-#         the corpus. Similar to the BaleenCorpusReader, this uses a generator
-#         to acheive memory safe iteration.
-#         """
-#         # Resolve the fileids and the categories
-#         fileids = self.resolve(fileids, categories)
-
-#         # Create a generator, loading one document into memory at a time.
-#         for path, enc, fileid in self.abspaths(fileids, True, True):
-#             with open(path, 'rb') as f:
-#                 yield pickle.load(f)
-
-#     def paras(self, fileids=None, categories=None):
-#         """
-#         Returns a generator of paragraphs where each paragraph is a list of
-#         sentences, which is in turn a list of (token, tag) tuples.
-#         """
-#         for doc in self.docs(fileids, categories):
-#             for paragraph in doc:
-#                 yield paragraph
-
-#     def sents(self, fileids=None, categories=None):
-#         """
-#         Returns a generator of sentences where each sentence is a list of
-#         (token, tag) tuples.
-#         """
-#         for paragraph in self.paras(fileids, categories):
-#             for sentence in paragraph:
-#                 yield sentence
-
-#     def tagged(self, fileids=None, categories=None):
-#         for sent in self.sents(fileids, categories):
-#             for token in sent:
-#                 yield token
-
-#     def words(self, fileids=None, categories=None):
-#         """
-#         Returns a generator of (token, tag) tuples.
-#         """
-#         for token in self.tagged(fileids, categories):
-#             yield token[0]
