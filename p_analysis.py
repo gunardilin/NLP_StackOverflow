@@ -5,6 +5,9 @@ import pandas as pd
 import bs4
 from b_sqlite_operation import SqliteOperation
 import xlwings
+import time
+from h_readsqlite import load_from_pickle, save_to_pickle
+from h_readsqlite import create_faulty_dict, create_total_index, create_existing_data_index
 
 # The index for existing data is necessary before executing this script.
 # To get the index, go back to h_readsqlite.py and execute:
@@ -17,6 +20,49 @@ MODEL_PATH = "other/model_2012-2021_1/LDA_model_6_topics"
 START_YEAR = 2012
 END_YEAR = 2021
 LIMIT = None
+
+FOLDER_PATH = "other/model_2012-2021_1/index"
+FAULTY_FILE_NAME = "faulty_data_index"
+TOTAL_FILE_NAME = "total_data_index"
+EXISTING_INDEX_PATH = "existing_data_index"
+
+DF_DOMINANT_TOPIC_PATH = "other/model_2012-2021_1/index/df_dominant_topic.pickle"
+
+total_path = "{}/{}.pickle".format(FOLDER_PATH, TOTAL_FILE_NAME)
+# "other/model_2012-2021_1/index/total_data_index.pickle"
+faulty_path = "{}/{}.pickle".format(FOLDER_PATH, FAULTY_FILE_NAME)
+# "other/model_2012-2021_1/index/faulty_data_index.pickle"
+existing_index_path = "{}/{}.pickle".format(FOLDER_PATH, EXISTING_INDEX_PATH)
+# "other/model_2012-2021_1/index/existing_data_index.pickle"
+
+### 0. Initialization:
+def initialization():
+    # a. create faulty_dict b. create total_index 
+    # c. remove faulty_index from total_index (using result from a and b)
+    # This step is necessary before executing further codes.
+    # Necessary because not all documents from DB can be parsed into string, 
+    # therefore some documents with errors were skipped. Therefore the 
+    # id sequence is messed up, due to some missing docs (0.02%)
+    start_time = time.time()
+    # Create dict containing docs that can't be parsed:
+    create_faulty_dict(DB_PATH, FOLDER_PATH, FAULTY_FILE_NAME)
+    # Get the id of all docs:
+    create_total_index(DB_PATH, FOLDER_PATH, TOTAL_FILE_NAME)
+    # Remove the faulty index (stored in faulty_dict) from total_index and saved
+    # in existing_data_index.pickle
+    create_existing_data_index(total_path, faulty_path, existing_index_path)
+    a = load_from_pickle(total_path)
+    b = load_from_pickle(faulty_path)
+    c = load_from_pickle(existing_index_path)
+
+    for i in list(a.keys()):
+        print("Year {}: {}".format(i, len(a[i])-len(b[i])==len(c[i])))
+        print(len(a[i]), len(b[i]), len(c[i]))
+    end_time = time.time()
+    print("Duration: {} seconds".format(round(end_time-start_time, 2)))
+    return
+
+# initialization()
 
 ### 1. Loading Lexicon
 print("Read Gensim Dictionary / Lexicon")
@@ -93,10 +139,34 @@ def format_topics_sentences(ldamodel, corpus, docs, limit:int=None):
     sent_topics_df.columns = ['Document_No', 'Dominant_Topic', 'Topic_Perc_Contrib', 'Keywords', 'Text']
     return(sent_topics_df)
 
-# 6. Show the table
+# 6. To get the correct Document ID under column Document_No execute:
+existing_index = load_from_pickle(existing_index_path)
+relevant_index = []
+for year in range(START_YEAR, END_YEAR+1):
+    relevant_index.extend(existing_index[year])
+
+# 7. Generate relevant doc_list because of 841 unparseable data:
+a = load_from_pickle(total_path)
+b = load_from_pickle(faulty_path)
+list_a, list_b, list_index = [], [], []
+for year in range(START_YEAR, END_YEAR+1):
+    list_a.extend(a[year])
+    list_b.extend(b[year])
+for i in list_b:
+    list_index.append(list_a.index(i))
+list_index.sort(reverse=True)
+for i in list_index:
+    del doc_list[i]
+
+# 7. Show the table
 print("Creating DF")
-df_dominant_topic = format_topics_sentences(ldamodel, docmatrix, doc_list, 100)
+df_dominant_topic = format_topics_sentences(ldamodel, docmatrix, doc_list, LIMIT)
+if LIMIT == None:
+    df_dominant_topic['Document_No'] = relevant_index
+else:
+    df_dominant_topic['Document_No'] = relevant_index[:LIMIT]
 print(df_dominant_topic.head(10))
+save_to_pickle(content=df_dominant_topic, file_path=DF_DOMINANT_TOPIC_PATH)
 print("Open table in Excel")
 xlwings.view(df_dominant_topic.head(100))
 print("Finish reading topics.")
