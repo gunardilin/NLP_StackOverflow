@@ -9,9 +9,20 @@ import time
 from h_readsqlite import load_from_pickle, save_to_pickle
 from h_readsqlite import create_faulty_dict, create_total_index, create_existing_data_index
 
+# The purpose of this script is to get the data from existing LDA model.  
+# The retreived data will be used for further analysis.
+
 # The index for existing data is necessary before executing this script.
 # To get the index, go back to h_readsqlite.py and execute:
 # 1. create_total_index 2. create_faulty_dict 3. create_existing_data_index
+# 4. Save it in pickle 5. Show in Table.
+
+#!!! This code needs to be executed once, because the result as Dataframe 
+# & pickle is saved under DF_DOMINANT_TOPIC_PATH and can be called
+# multiple times by:
+# a = load_from_pickle(DF_DOMINANT_TOPIC_PATH)
+# b = xlwings.view(a.head(100))
+
 
 DB_PATH = "DB/StackOverflow.sqlite"
 LEXICON_PATH = "other/model_2012-2021_1/lexicon.pkl"
@@ -145,7 +156,7 @@ relevant_index = []
 for year in range(START_YEAR, END_YEAR+1):
     relevant_index.extend(existing_index[year])
 
-# 7. Generate relevant doc_list because of 841 unparseable data:
+# 7. Generate relevant doc_list and exclude the 841 unparseable data:
 a = load_from_pickle(total_path)
 b = load_from_pickle(faulty_path)
 list_a, list_b, list_index = [], [], []
