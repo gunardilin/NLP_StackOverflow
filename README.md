@@ -10,6 +10,7 @@ This repository includes:
 4. Code for KMeans clustering. (The result for KMeans is not included in my paper.)
 5. Code for performing LDA topic discovery.
 6. Mermaid markdown code to showcase process overview in this analysis.
+7. Jupyter_Notebook folder contains coding for visualization.
 
 Important link:
 1. Gensim-Scikit Wrapper from Gensim 3.8.3: https://github.com/RaRe-Technologies/gensim/releases/tag/3.8.3
